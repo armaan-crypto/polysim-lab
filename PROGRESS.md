@@ -1,5 +1,5 @@
 STATUS: IN_PROGRESS
-LOCK: 2026-10-27T07:49Z
+LOCK: 2026-10-27T08:02Z
 
 # Progress
 
@@ -13,34 +13,43 @@ Details for each phase are in docs/BUILD_SPEC.md.
 - [x] Phase 3: Portfolio, resolution and accounting (PnL, resolution risk, neg-risk)
 - [x] Phase 4: Strategy framework (interface, lookahead guard, six reference strategies)
 - [x] Phase 5: Backtester and experiment runner (event-driven, sweeps, synthetic data, stress)
-- [ ] Phase 6: Metrics and reports (metrics, theory vs realized edge, HTML report)
+- [x] Phase 6: Metrics and reports (metrics, theory vs realized edge, HTML report)
 - [ ] Phase 7: Paper trading mode (live feed, no-order guard test)
 - [ ] Phase 8: Hardening (coverage, profiling, ASSUMPTIONS.md, LIMITATIONS.md)
 
 ## Current work (resume here if a session stopped mid-phase)
 
-Phase 6 plan: `analysis/metrics.py` (net PnL, return on capital, annualized return on locked
-capital, Sharpe from the equity curve, max drawdown, hit rate, average edge per trade, fill rate,
-leg-failure rate, slippage vs quoted edge, resolution-loss count), theory vs realized edge per
-strategy, `analysis/report.py` (static HTML per run: equity curve PNG via matplotlib, trade table,
-failure log, synthetic label banner), `pmsim report` CLI. Check `git log` for what landed.
+Phase 7 plan: `engine/paper.py` (live paper trading: WebSocket feed -> parse_message -> events ->
+same FillEngine/Portfolio/Strategy loop as the backtester; decision log with a reason for every
+intent, reject, fill and cancel; JSON state snapshot every N seconds and on exit, restore on start),
+`pmsim paper --strategy X --markets <filter> --hours N`, and a guard test that fails if any
+module imports a trading or signing package (py_clob_client, eth_account, web3, ...) or names an
+order-posting endpoint. Check `git log` for what landed.
 
 ## Synthetic stress results (SYNTHETIC DATA, default SyntheticConfig, 6 h, seed 42)
 
 These are labeled synthetic. They show the machinery works; they say nothing about live profit.
+Run `uv run pmsim backtest --strategy NAME --stress` to reproduce.
 
-| Strategy | base | latency x3 | depth x0.5 | fees x2 | verdict |
-| - | - | - | - | - | - |
-| complementary | $143.00 | $143.00 | $127.01 | $110.13 | pass (synthetic) |
-| negrisk_sum | $22.31 | $22.31 | $11.15 | $18.11 | pass (synthetic) |
-| near_resolution | -$2,703.70 | -$2,703.70 | -$2,709.37 | -$2,718.62 | fail |
-| market_making | -$128.53 | -$128.53 | -$55.85 | -$128.53 | fail |
-| cross_platform | $857.74 | $857.74 | $717.70 | -$228.89 | fail |
+| Strategy | base | latency x3 | depth x0.5 | fees x2 | verdict | edge capture |
+| - | - | - | - | - | - | - |
+| complementary | $196.11 | $196.11 | $167.34 | $123.53 | pass (synthetic) | 1.00 |
+| negrisk_sum | $13.83 | $13.83 | $6.81 | $6.23 | pass (synthetic) | 1.00 |
+| logical | $4.16 | $4.16 | $2.08 | $1.66 | pass (synthetic) | 1.00 |
+| cross_platform | $938.02 | $938.02 | $208.85 | $71.13 | pass (synthetic) | 3.10 |
+| near_resolution | -$2,692.47 | -$2,692.47 | -$2,701.99 | -$2,707.94 | fail | -8.76 |
+| market_making | -$421.70 | -$421.70 | -$212.11 | -$421.70 | fail | n/a |
 
-Notes: the arbitrage passes come from mispricings the generator injects on purpose. Latency x3
-changes nothing because synthetic books update every 5 s. Cross-platform PnL is dominated by the
-2% per-market chance that Kalshi resolves differently: with 4 markets one disagreement swings
-every pair on that market to $0 or $2.
+Notes, read before quoting any number above:
+- The three arbitrage passes come from mispricings the generator injects on purpose. Real books
+  may never show them; Polymarket's YES and NO books are linked by the matching engine.
+- Latency x3 changes nothing because synthetic books update every 5 s. The latency stress is
+  only meaningful on recorded data.
+- Cross-platform realized PnL is mostly resolution luck: with 4 markets, one 2% Kalshi
+  disagreement swings every pair on that market to $0 or $2. A capture above 1 is not skill.
+- Near-resolution buys 0.95-0.99 outcomes whose synthetic win rate is the walk's own probability,
+  so it pays the spread and fees for no edge. Market making loses to adverse selection on a
+  random walk and pays no fees as a maker.
 
 ## Final review (after Phase 8)
 
@@ -66,6 +75,9 @@ every pair on that market to $0 or $2.
 
 (newest first; one line per session: UTC time, phase, result)
 
+- 2026-10-27T08:02Z: Phase 6 done, `make check` passes (187 tests). Metrics (docs/METRICS.md in LaTeX),
+  theory vs realized edge (`pmsim edges`), HTML report (`pmsim backtest --report`), synthetic
+  nested markets so the logical strategy runs. Next: Phase 7 (paper trading).
 - 2026-10-27T07:49Z: Phase 5 done, `make check` passes (178 tests). Synthetic generator, event-driven
   backtester, mock Kalshi venue, registry, sweeps, walk-forward, parallel runs, stress tests,
   `pmsim backtest`. First synthetic runs exposed a half-updated-pair bug, a stale own-impact view

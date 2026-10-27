@@ -33,6 +33,8 @@ uv run pmsim --version
 uv run pmsim fetch --limit 500                                # market catalog -> data/catalog.parquet
 uv run pmsim record --markets "tag:fed,neg_risk" --hours 1    # books + trades -> data/raw/<table>/
 uv run pmsim backtest --strategy complementary --stress       # synthetic data, labeled as such
+uv run pmsim backtest --strategy logical --report reports/logical.html
+uv run pmsim edges                                            # theoretical vs realized edge
 ```
 
 `--markets` takes comma separated terms (OR-ed): a slug substring, `tag:<slug>`,

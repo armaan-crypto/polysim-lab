@@ -30,9 +30,9 @@ class Metrics:
     max_drawdown_usd: float
     max_drawdown_pct: float
     hit_rate: float
-    trades: int
-    avg_edge_per_trade_usd: float
-    avg_realized_per_trade_usd: float
+    closed_positions: int
+    avg_edge_per_entry_usd: float
+    avg_pnl_per_position_usd: float
     fill_rate: float
     leg_failure_rate: float
     theoretical_edge_usd: float
@@ -104,9 +104,9 @@ def compute(res: BacktestResult) -> Metrics:
         max_drawdown_usd=dd_usd,
         max_drawdown_pct=dd_pct,
         hit_rate=wins / trades if trades else 0.0,
-        trades=trades,
-        avg_edge_per_trade_usd=usd(res.expected_edge) / edge_orders if edge_orders else 0.0,
-        avg_realized_per_trade_usd=usd(sum(c.pnl for c in res.closed)) / trades if trades else 0.0,
+        closed_positions=trades,
+        avg_edge_per_entry_usd=usd(res.expected_edge) / edge_orders if edge_orders else 0.0,
+        avg_pnl_per_position_usd=usd(sum(c.pnl for c in res.closed)) / trades if trades else 0.0,
         fill_rate=res.orders_filled / res.orders if res.orders else 0.0,
         leg_failure_rate=res.legs.failed / groups if res.legs and groups else 0.0,
         theoretical_edge_usd=usd(res.expected_edge),

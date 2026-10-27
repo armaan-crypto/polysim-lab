@@ -62,3 +62,9 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: Stress pass rule: net PnL > 0 in base and in each single stress (latency x3, depth x0.5, fees x2).
 - 2026-10-27: Parallel runs use a process pool over picklable RunSpecs; results come back in spec order, so serial and parallel agree (tested).
 - 2026-10-27: Walk-forward: time split into folds + 1 equal windows; tune on window k by net PnL, test on window k + 1.
+- 2026-10-27: Metrics count closed positions (not fills) for hit rate and PnL per position, and entries that carried an edge for edge per entry. Fills split one decision into many pieces.
+- 2026-10-27: Sharpe uses equity samples every `equity_every_ms` with zero risk-free rate, annualized by samples per year. Mark-to-market noise inflates it on short runs.
+- 2026-10-27: Annualized return on locked capital is simple, not compounded. Short holds would explode under compounding.
+- 2026-10-27: Slippage = theoretical edge - net PnL, so it includes leg failures, unwinds and resolution surprises, not only price slippage.
+- 2026-10-27: The HTML report is one static file with the chart inlined as base64 PNG and all text escaped. Easy to share, no server.
+- 2026-10-27: Synthetic data gained nested subset/superset pairs with injected violations. Without them the logical strategy never ran.

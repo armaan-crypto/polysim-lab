@@ -20,7 +20,7 @@ from pmsim.book.replay import BookSnapshot, MarketEvent, TradePrint
 from pmsim.book.units import PRICE_SCALE, size_units
 from pmsim.data.kalshi import MockQuoteFeed, Quote, leg_token
 from pmsim.engine.fees import FeeModel, MarketRules
-from pmsim.engine.universe import CrossLink, MarketData, Universe
+from pmsim.engine.universe import CrossLink, LogicalLink, MarketData, Universe
 from pmsim.risk.negrisk import GroupMarket, NegRiskGroup
 from pmsim.risk.resolution import HOUR_MS, Resolution, binary_payouts, group_payouts
 from pmsim.strategies.base import TokenMeta
@@ -54,6 +54,9 @@ class SyntheticConfig(BaseModel):
     fee_rate: float = Field(default=0.05, ge=0)  # docs "Other / General" taker rate
     kalshi_noise: float = Field(default=0.02, ge=0)
     p_kalshi_disagree: float = Field(default=0.02, ge=0, le=1)  # rule mismatch risk
+    n_nested: int = Field(default=1, ge=0)  # subset/superset market pairs
+    p_nested_violation: float = Field(default=0.01, ge=0, le=1)
+    violation_ticks: int = Field(default=4, ge=1)
 
 
 @dataclass
@@ -65,6 +68,16 @@ class _Book:
     depth: int
     stale_left: int = 0
     halt_left: int = 0
+
+
+@dataclass
+class _Nested:
+    """A superset market and a subset market whose probability is a fraction of it."""
+
+    sup: _Book
+    sub: _Book
+    x: float  # superset log-odds
+    y: float  # log-odds of the subset share
 
 
 def _sigmoid(x: float) -> float:
@@ -164,6 +177,7 @@ class Generator:
         resolutions: list[Resolution] = []
         quotes: dict[str, list[Quote]] = {}
         links: list[CrossLink] = []
+        links_logical: list[LogicalLink] = []
 
         def add_meta(yes: str, no: str, mid: str, group: str = "") -> None:
             for i, (tok, comp) in enumerate(((yes, no), (no, yes))):
@@ -190,6 +204,21 @@ class Generator:
             groups.append(NegRiskGroup(f"grp{g}", tuple(markets)))
             group_state.append((books, [self.rng.gauss(0, 1) for _ in range(cfg.group_size)]))
 
+        nested: list[_Nested] = []
+        for k in range(cfg.n_nested):
+            sup, sub = f"nest{k}-sup", f"nest{k}-sub"
+            add_meta(f"{sup}-yes", f"{sup}-no", sup)
+            add_meta(f"{sub}-yes", f"{sub}-no", sub)
+            links_logical.append(LogicalLink(f"nest{k}", f"{sub}-no", f"{sup}-yes"))
+            nested.append(
+                _Nested(
+                    self._new_book(f"{sup}-yes", f"{sup}-no"),
+                    self._new_book(f"{sub}-yes", f"{sub}-no"),
+                    self.rng.uniform(-1, 1),
+                    self.rng.uniform(-1, 1),
+                )
+            )
+
         for step in range(self.steps):
             ts = step * cfg.step_ms
             for i, (book, x) in enumerate(binaries):
@@ -204,6 +233,15 @@ class Generator:
                 probs = _softmax(xs)
                 for book, p in zip(books, probs, strict=True):
                     self._step_book(book, p, ts)
+            for n in nested:
+                n.x += self._shock()
+                n.y += self._shock()
+                p_sup = _sigmoid(n.x)
+                p_sub = p_sup * _sigmoid(n.y)
+                if self.rng.random() < cfg.p_nested_violation:
+                    p_sub = min(0.98, p_sup + cfg.violation_ticks * self.tick / PRICE_SCALE)
+                self._step_book(n.sup, p_sup, ts)
+                self._step_book(n.sub, p_sub, ts)
 
         res_ts = self.end_ts + 2 * HOUR_MS
         for m, (book, x) in enumerate(binaries):
@@ -219,8 +257,22 @@ class Generator:
             winner = self._pick(_softmax(xs))
             resolutions.append(Resolution(res_ts, "winner", group_payouts(group, winner)))
 
+        for n in nested:
+            sup_wins = self.rng.random() < _sigmoid(n.x)
+            sub_wins = sup_wins and self.rng.random() < _sigmoid(n.y)
+            payouts = binary_payouts(n.sup.yes, n.sup.no, "winner", sup_wins)
+            payouts.update(binary_payouts(n.sub.yes, n.sub.no, "winner", sub_wins))
+            resolutions.append(Resolution(res_ts, "winner", payouts))
+
         uni = Universe(
-            meta, all_rules, "synthetic", groups, resolutions, MockQuoteFeed(quotes), links
+            meta,
+            all_rules,
+            "synthetic",
+            groups,
+            resolutions,
+            MockQuoteFeed(quotes),
+            links,
+            links_logical,
         )
         self.events.sort(key=lambda e: (e.ts, e.recv_ts))
         return MarketData(uni, self.events)

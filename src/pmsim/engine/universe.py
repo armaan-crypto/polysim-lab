@@ -29,6 +29,15 @@ class CrossLink:
     mismatch: float
 
 
+@dataclass(frozen=True)
+class LogicalLink:
+    """Event `subset` implies event `superset`."""
+
+    name: str
+    subset_no: str
+    superset_yes: str
+
+
 @dataclass
 class Universe:
     meta: dict[str, TokenMeta]
@@ -38,6 +47,7 @@ class Universe:
     resolutions: list[Resolution] = field(default_factory=list)
     feed: QuoteFeed | None = None
     cross_links: list[CrossLink] = field(default_factory=list)
+    logical_links: list[LogicalLink] = field(default_factory=list)
 
 
 @dataclass

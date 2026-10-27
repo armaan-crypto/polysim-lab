@@ -10,7 +10,7 @@ from pmsim.engine.universe import Universe
 from pmsim.strategies.base import Strategy
 from pmsim.strategies.complementary import ComplementaryArb, ComplementaryConfig
 from pmsim.strategies.cross_platform import CrossPair, CrossPlatformConfig, CrossPlatformSpread
-from pmsim.strategies.logical import LogicalArb, LogicalConfig
+from pmsim.strategies.logical import LogicalArb, LogicalConfig, Relation
 from pmsim.strategies.market_making import MarketMaker, MarketMakingConfig
 from pmsim.strategies.near_resolution import NearResolutionConfig, NearResolutionYield
 from pmsim.strategies.negrisk_sum import NegRiskSumArb, NegRiskSumConfig
@@ -35,11 +35,21 @@ def _cross(params: Params, uni: Universe) -> Strategy:
     return CrossPlatformSpread(feed, CrossPlatformConfig.model_validate(cfg))
 
 
+def _logical(params: Params, uni: Universe) -> Strategy:
+    cfg = dict(params)
+    if "relations" not in cfg:
+        cfg["relations"] = [
+            Relation(name=r.name, subset_no=r.subset_no, superset_yes=r.superset_yes)
+            for r in uni.logical_links
+        ]
+    return LogicalArb(LogicalConfig.model_validate(cfg))
+
+
 BUILDERS: dict[str, Callable[[Params, Universe], Strategy]] = {
     "complementary": lambda p, _: ComplementaryArb(ComplementaryConfig.model_validate(p)),
     "negrisk_sum": lambda p, _: NegRiskSumArb(NegRiskSumConfig.model_validate(p)),
     "near_resolution": lambda p, _: NearResolutionYield(NearResolutionConfig.model_validate(p)),
-    "logical": lambda p, _: LogicalArb(LogicalConfig.model_validate(p)),
+    "logical": _logical,
     "market_making": lambda p, _: MarketMaker(MarketMakingConfig.model_validate(p)),
     "cross_platform": _cross,
 }

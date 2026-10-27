@@ -12,6 +12,7 @@ from pathlib import Path
 import websockets
 
 from pmsim import __version__
+from pmsim.analysis.metrics import edge_table
 from pmsim.analysis.report import write_report
 from pmsim.config import Config, load_config
 from pmsim.data.catalog import build_catalog, load_catalog, save_catalog, select_markets
@@ -59,6 +60,11 @@ def build_parser() -> argparse.ArgumentParser:
     bt.add_argument("--stress", action="store_true", help="also run the stress variants")
     bt.add_argument("--workers", type=int, default=1)
     bt.add_argument("--report", type=Path, default=None, help="write an HTML report here")
+
+    ed = sub.add_parser("edges", help="theoretical vs realized edge for every strategy")
+    ed.add_argument("--data", choices=["synthetic", "recorded"], default="synthetic")
+    ed.add_argument("--seed", type=int, default=None)
+    ed.add_argument("--hours", type=float, default=6.0)
     return parser
 
 
@@ -126,6 +132,19 @@ def cmd_backtest(cfg: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_edges(cfg: Config, args: argparse.Namespace) -> int:
+    data = _data_spec(cfg, args.data, args.seed, args.hours)
+    bt = BacktestConfig(latency_ms=cfg.latency_ms, gas_per_trade_usd=cfg.fees.gas_per_trade_usd)
+    results = [run_full(RunSpec.make(name, {}, data, backtest=bt)) for name in sorted(BUILDERS)]
+    print(f"{'strategy':16s} {'data':10s} {'theoretical':>12s} {'realized':>12s} {'capture':>8s}")
+    for row in edge_table(results):
+        print(
+            f"{row.strategy:16s} {row.label:10s} {row.theoretical_usd:12,.2f} "
+            f"{row.realized_usd:12,.2f} {row.capture:8.2f}"
+        )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and return an exit code."""
     args = build_parser().parse_args(argv)
@@ -136,4 +155,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         return cmd_fetch(cfg, args.limit, args.closed)
     if args.command == "record":
         return cmd_record(cfg, args.markets, args.hours)
+    if args.command == "edges":
+        return cmd_edges(cfg, args)
     return cmd_backtest(cfg, args)

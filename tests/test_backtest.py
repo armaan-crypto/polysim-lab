@@ -321,3 +321,15 @@ def _events(frame: str) -> list[dict[str, str]]:
 
 def test_cash_scale_sanity() -> None:
     assert CASH_SCALE == PRICE_SCALE * SIZE_SCALE
+
+
+def test_synthetic_nested_links_feed_logical_strategy() -> None:
+    data = generate(SMALL)
+    link = data.universe.logical_links[0]
+    assert link.subset_no.endswith("sub-no") and link.superset_yes.endswith("sup-yes")
+    strat = build_strategy("logical", {}, data.universe)
+    assert strat.cfg.relations[0].subset_no == link.subset_no  # type: ignore[attr-defined]
+    for r in data.universe.resolutions:
+        if link.superset_yes in r.payouts:
+            sub_yes = link.subset_no.replace("-no", "-yes")
+            assert r.payouts[sub_yes] <= r.payouts[link.superset_yes]  # subset implies superset
