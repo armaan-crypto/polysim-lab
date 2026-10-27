@@ -68,3 +68,8 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: Slippage = theoretical edge - net PnL, so it includes leg failures, unwinds and resolution surprises, not only price slippage.
 - 2026-10-27: The HTML report is one static file with the chart inlined as base64 PNG and all text escaped. Easy to share, no server.
 - 2026-10-27: Synthetic data gained nested subset/superset pairs with injected violations. Without them the logical strategy never ran.
+- 2026-10-27: Paper trading reuses the backtest loop and the recorder's WebSocket client through a `Sink` protocol. One fill model and one parser for history and live.
+- 2026-10-27: Live timers run on wall-clock time inside `add`; heartbeat replies (PONG) arrive every 10 s, so timers keep running in quiet markets.
+- 2026-10-27: Paper decisions stream to JSONL and are dropped from memory once written. Long sessions stay bounded.
+- 2026-10-27: Restart restores the portfolio but not open simulated orders or strategy leg state (cancel-on-disconnect). Simple and safe.
+- 2026-10-27: Safeguard tests scan the source AST: no trading or signing packages, no order or cancel endpoint literals, no write calls on HTTP clients, no HTTP write method literals, and none of those packages in dependencies.

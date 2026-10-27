@@ -35,6 +35,7 @@ uv run pmsim record --markets "tag:fed,neg_risk" --hours 1    # books + trades -
 uv run pmsim backtest --strategy complementary --stress       # synthetic data, labeled as such
 uv run pmsim backtest --strategy logical --report reports/logical.html
 uv run pmsim edges                                            # theoretical vs realized edge
+uv run pmsim paper --strategy market_making --markets "tag:fed" --hours 1   # simulated fills only
 ```
 
 `--markets` takes comma separated terms (OR-ed): a slug substring, `tag:<slug>`,

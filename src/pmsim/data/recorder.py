@@ -181,6 +181,13 @@ class ParquetSink:
             self._buf[table] = []
 
 
+class Sink(Protocol):
+    """Where parsed rows go: Parquet files when recording, a simulator when paper trading."""
+
+    def add(self, rows: Rows) -> None: ...
+    def flush(self) -> None: ...
+
+
 class Socket(Protocol):
     async def send(self, message: str) -> None: ...
     async def recv(self) -> str | bytes: ...
@@ -209,7 +216,7 @@ async def _frames(ws: Socket, deadline: float) -> AsyncIterator[str]:
 
 
 async def _session(
-    connect: Connect, url: str, asset_ids: list[str], sink: ParquetSink, deadline: float
+    connect: Connect, url: str, asset_ids: list[str], sink: Sink, deadline: float
 ) -> None:
     async with connect(url) as ws:
         await ws.send(subscribe_frame(asset_ids))
@@ -226,7 +233,7 @@ async def record(
     url: str,
     asset_ids: list[str],
     duration_s: float,
-    sink: ParquetSink,
+    sink: Sink,
     max_reconnects: int = 20,
     backoff_s: float = 1.0,
 ) -> None:

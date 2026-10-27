@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import sys
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -14,13 +15,15 @@ import websockets
 from pmsim import __version__
 from pmsim.analysis.metrics import edge_table
 from pmsim.analysis.report import write_report
+from pmsim.book.units import CASH_SCALE
 from pmsim.config import Config, load_config
 from pmsim.data.catalog import build_catalog, load_catalog, save_catalog, select_markets
 from pmsim.data.gamma import GammaClient
 from pmsim.data.http import HttpClient, JsonCache
 from pmsim.data.recorder import ParquetSink, record
 from pmsim.data.synthetic import SyntheticConfig
-from pmsim.engine.backtest import BacktestConfig
+from pmsim.engine import state
+from pmsim.engine.backtest import Backtest, BacktestConfig
 from pmsim.engine.experiment import (
     DataSpec,
     RecordedSpec,
@@ -29,7 +32,9 @@ from pmsim.engine.experiment import (
     run_one,
     stress_test,
 )
-from pmsim.strategies.registry import BUILDERS
+from pmsim.engine.paper import PaperSink
+from pmsim.engine.universe import MarketData, universe_from_catalog
+from pmsim.strategies.registry import BUILDERS, build_strategy
 
 DEFAULT_CONFIG = Path("config/default.yaml")
 
@@ -60,6 +65,13 @@ def build_parser() -> argparse.ArgumentParser:
     bt.add_argument("--stress", action="store_true", help="also run the stress variants")
     bt.add_argument("--workers", type=int, default=1)
     bt.add_argument("--report", type=Path, default=None, help="write an HTML report here")
+
+    pp = sub.add_parser("paper", help="paper trade a strategy on the live feed (no real orders)")
+    pp.add_argument("--strategy", required=True, choices=sorted(BUILDERS))
+    pp.add_argument("--markets", required=True, help="same filter as `record`")
+    pp.add_argument("--hours", type=float, required=True)
+    pp.add_argument("--params", default="{}", help="strategy parameters as JSON")
+    pp.add_argument("--session", default="paper", help="name for the state and log files")
 
     ed = sub.add_parser("edges", help="theoretical vs realized edge for every strategy")
     ed.add_argument("--data", choices=["synthetic", "recorded"], default="synthetic")
@@ -132,6 +144,36 @@ def cmd_backtest(cfg: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_paper(cfg: Config, args: argparse.Namespace) -> int:
+    try:
+        catalog = select_markets(load_catalog(cfg.data_dir), args.markets)
+    except FileNotFoundError:
+        print("no catalog found; run `pmsim fetch` first", file=sys.stderr)
+        return 2
+    if catalog.is_empty():
+        print(f"no open markets match {args.markets!r}", file=sys.stderr)
+        return 2
+    universe = universe_from_catalog(catalog, cfg.fees)
+    strategy = build_strategy(args.strategy, json.loads(args.params), universe)
+    root = cfg.data_dir / "paper"
+    state_path, log_path = root / f"{args.session}.state.json", root / f"{args.session}.log.jsonl"
+    resumed = state.load(state_path)
+    start = int(time.time() * 1000)
+    if resumed is not None:
+        resumed.now = max(resumed.now, start)
+    bt_cfg = BacktestConfig(latency_ms=cfg.latency_ms, gas_per_trade_usd=cfg.fees.gas_per_trade_usd)
+    bt = Backtest(strategy, MarketData(universe, []), bt_cfg, start_ts=start, portfolio=resumed)
+    sink = PaperSink(bt, log_path, state_path)
+    tokens = catalog["token_id"].to_list()
+    word = "resuming" if resumed else "starting"
+    print(f"{word} paper session {args.session!r}: {args.strategy} on {len(tokens)} tokens")
+    asyncio.run(record(websockets.connect, cfg.api.ws_url, tokens, args.hours * 3600, sink))
+    pf = bt.portfolio
+    print(f"cash ${pf.cash / CASH_SCALE:,.2f}, realized ${pf.realized() / CASH_SCALE:,.2f}")
+    print(f"state: {state_path}  log: {log_path}")
+    return 0
+
+
 def cmd_edges(cfg: Config, args: argparse.Namespace) -> int:
     data = _data_spec(cfg, args.data, args.seed, args.hours)
     bt = BacktestConfig(latency_ms=cfg.latency_ms, gas_per_trade_usd=cfg.fees.gas_per_trade_usd)
@@ -155,6 +197,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return cmd_fetch(cfg, args.limit, args.closed)
     if args.command == "record":
         return cmd_record(cfg, args.markets, args.hours)
+    if args.command == "paper":
+        return cmd_paper(cfg, args)
     if args.command == "edges":
         return cmd_edges(cfg, args)
     return cmd_backtest(cfg, args)

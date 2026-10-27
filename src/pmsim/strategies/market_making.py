@@ -63,7 +63,7 @@ class MarketMaker(Strategy):
 
     def on_book(self, update: BookUpdate) -> list[Intent]:
         token = update.token
-        if self.cfg.tokens and token not in self.cfg.tokens:
+        if token not in self.view.rules or (self.cfg.tokens and token not in self.cfg.tokens):
             return []
         want = self.quotes(token)
         tick = self.view.rules[token].tick

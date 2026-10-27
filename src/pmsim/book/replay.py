@@ -98,16 +98,18 @@ def _ticks(df: pl.DataFrame) -> Iterator[TickChange]:
         yield TickChange(token, ts, recv, price_units(tick))
 
 
+READERS: dict[str, Callable[[pl.DataFrame], Iterator[MarketEvent]]] = {
+    "book_snapshots": _snapshots,
+    "book_deltas": _deltas,
+    "trades": _trades,
+    "tick_size_changes": _ticks,
+}
+
+
 def load_events(raw_dir: Path, tokens: set[str] | None = None) -> list[MarketEvent]:
     """Read recorder output under `raw_dir` and return events in replay order."""
-    readers: dict[str, Callable[[pl.DataFrame], Iterator[MarketEvent]]] = {
-        "book_snapshots": _snapshots,
-        "book_deltas": _deltas,
-        "trades": _trades,
-        "tick_size_changes": _ticks,
-    }
     events: list[MarketEvent] = []
-    for table, reader in readers.items():
+    for table, reader in READERS.items():
         df = _scan(raw_dir, table, tokens)
         if df is not None:
             events.extend(reader(df))

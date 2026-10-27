@@ -1,5 +1,5 @@
 STATUS: IN_PROGRESS
-LOCK: 2026-10-27T08:02Z
+LOCK: 2026-10-27T08:07Z
 
 # Progress
 
@@ -14,17 +14,16 @@ Details for each phase are in docs/BUILD_SPEC.md.
 - [x] Phase 4: Strategy framework (interface, lookahead guard, six reference strategies)
 - [x] Phase 5: Backtester and experiment runner (event-driven, sweeps, synthetic data, stress)
 - [x] Phase 6: Metrics and reports (metrics, theory vs realized edge, HTML report)
-- [ ] Phase 7: Paper trading mode (live feed, no-order guard test)
+- [x] Phase 7: Paper trading mode (live feed, no-order guard test)
 - [ ] Phase 8: Hardening (coverage, profiling, ASSUMPTIONS.md, LIMITATIONS.md)
 
 ## Current work (resume here if a session stopped mid-phase)
 
-Phase 7 plan: `engine/paper.py` (live paper trading: WebSocket feed -> parse_message -> events ->
-same FillEngine/Portfolio/Strategy loop as the backtester; decision log with a reason for every
-intent, reject, fill and cancel; JSON state snapshot every N seconds and on exit, restore on start),
-`pmsim paper --strategy X --markets <filter> --hours N`, and a guard test that fails if any
-module imports a trading or signing package (py_clob_client, eth_account, web3, ...) or names an
-order-posting endpoint. Check `git log` for what landed.
+Phase 8 plan: coverage report (`pytest --cov`) and tests until engine, book and portfolio
+modules are above 85%; profile a one-day replay (synthetic 24 h, plus the recorded sample) and
+speed up hot spots until it runs under 60 s; write docs/ASSUMPTIONS.md (fee model date,
+latency, queue model limits, resolution-risk assumptions) and docs/LIMITATIONS.md (what the
+simulator cannot predict). Then the final review at the end of this file. Check `git log`.
 
 ## Synthetic stress results (SYNTHETIC DATA, default SyntheticConfig, 6 h, seed 42)
 
@@ -67,6 +66,8 @@ Notes, read before quoting any number above:
 - `tick_size_change` frames: parser built from the docs example; none seen live.
 - Fill model queue estimates and latency have not been compared with real fills (no real orders, by design).
   Resting orders can only fill from trade prints; the WS trade `side` meaning is unverified.
+- Paper trading ran live for about 50 s (market maker, 16 Fed tokens): 11 quotes, no fills, log
+  and state written, restart resumed. A multi-hour paper run is still to do.
 - Kalshi taker fee schedule: assumed 0.07 * C * p * (1 - p). Check the Kalshi fee schedule.
 - Kalshi public endpoints reached from this machine; fixtures recorded. The client is untested against
   pagination and rate limits.
@@ -75,6 +76,10 @@ Notes, read before quoting any number above:
 
 (newest first; one line per session: UTC time, phase, result)
 
+- 2026-10-27T08:07Z: Phase 7 done, `make check` passes (201 tests). `pmsim paper` drives the backtest loop
+  from the live WebSocket feed through the recorder (same fill model), logs every decision with
+  a reason to JSONL, saves state atomically and resumes it. Safeguard tests fail on trading or
+  signing imports, order endpoints or HTTP write calls. Next: Phase 8 (hardening).
 - 2026-10-27T08:02Z: Phase 6 done, `make check` passes (187 tests). Metrics (docs/METRICS.md in LaTeX),
   theory vs realized edge (`pmsim edges`), HTML report (`pmsim backtest --report`), synthetic
   nested markets so the logical strategy runs. Next: Phase 7 (paper trading).
