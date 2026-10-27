@@ -3,10 +3,12 @@ data_dir: data
 seed: 42
 latency_ms: 150
 fees:
-  taker_bps: 0
-  maker_bps: 0
-  gas_per_trade_usd: 0.0
-  checked_on: null   # set to the date the fee schedule was read from the docs
+  # taker fee per fill = C * rate * p * (1 - p); makers pay none (docs.polymarket.com/trading/fees)
+  default_taker_rate: 0.05   # used when a market has no fee schedule ("Other / General")
+  maker_rate: 0.0
+  multiplier: 1.0            # stress tests raise this
+  gas_per_trade_usd: 0.0     # settlement cost per fill
+  checked_on: 2026-10-27
 api:
   gamma_url: https://gamma-api.polymarket.com
   clob_url: https://clob.polymarket.com

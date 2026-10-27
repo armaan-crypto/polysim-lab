@@ -10,12 +10,17 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class FeeConfig(BaseModel):
-    """Fee model parameters. `checked_on` records when the docs were last read."""
+    """Fee model parameters. `checked_on` records when the docs were last read.
+
+    Taker fee per fill is C * rate * p * (1 - p) (docs, checked 2026-10-27).
+    Each market's own rate from the catalog is used when it has a schedule.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    taker_bps: float = Field(default=0.0, ge=0)
-    maker_bps: float = Field(default=0.0, ge=0)
+    default_taker_rate: float = Field(default=0.05, ge=0)
+    maker_rate: float = Field(default=0.0, ge=0)
+    multiplier: float = Field(default=1.0, ge=0)
     gas_per_trade_usd: float = Field(default=0.0, ge=0)
     checked_on: date | None = None
 
