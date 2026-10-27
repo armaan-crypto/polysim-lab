@@ -37,9 +37,24 @@ class LogicalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     relations: list[Relation] = Field(default_factory=list)
-    min_edge_usd_per_share: float = Field(default=0.01, ge=0)
-    max_shares: float = Field(default=100, gt=0)
-    leg_timeout_ms: int = Field(default=2_000, gt=0)
+    min_edge_usd_per_share: float = Field(
+        default=0.01,
+        ge=0,
+        title="Minimum profit per share",
+        description="Only trade when the pair is mispriced by at least this many dollars.",
+    )
+    max_shares: float = Field(
+        default=100,
+        gt=0,
+        title="Shares per trade",
+        description="Largest number of pairs bought in one go.",
+    )
+    leg_timeout_ms: int = Field(
+        default=2_000,
+        gt=0,
+        title="Leg timeout (ms)",
+        description="If only one side fills within this time, sell the extra side back.",
+    )
 
 
 class LogicalArb(LegStrategy):

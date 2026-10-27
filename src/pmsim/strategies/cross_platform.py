@@ -39,12 +39,43 @@ class CrossPlatformConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     pairs: list[CrossPair] = Field(default_factory=list)
-    min_edge_usd_per_share: float = Field(default=0.01, ge=0)
-    max_mismatch: float = Field(default=0.3, ge=0, le=1)
-    mismatch_penalty_usd: float = Field(default=0.05, ge=0)
-    kalshi_fee_rate: float = Field(default=0.07, ge=0)  # assumed, same form as Polymarket
-    max_shares: float = Field(default=100, gt=0)
-    leg_timeout_ms: int = Field(default=3_000, gt=0)
+    min_edge_usd_per_share: float = Field(
+        default=0.01,
+        ge=0,
+        title="Minimum profit per share",
+        description="Only trade when both legs lock in at least this many dollars per share.",
+    )
+    max_mismatch: float = Field(
+        default=0.3,
+        ge=0,
+        le=1,
+        title="Rules mismatch limit",
+        description="Skip pairs whose resolution rules differ more than this (0 to 1).",
+    )
+    mismatch_penalty_usd: float = Field(
+        default=0.05,
+        ge=0,
+        title="Mismatch penalty",
+        description="Dollars per share subtracted for each unit of rules mismatch.",
+    )
+    kalshi_fee_rate: float = Field(
+        default=0.07,
+        ge=0,
+        title="Kalshi fee rate",
+        description="Assumed Kalshi taker fee rate (unverified).",
+    )  # assumed, same form as Polymarket
+    max_shares: float = Field(
+        default=100,
+        gt=0,
+        title="Shares per trade",
+        description="Largest number of pairs bought in one go.",
+    )
+    leg_timeout_ms: int = Field(
+        default=3_000,
+        gt=0,
+        title="Leg timeout (ms)",
+        description="If only one leg fills within this time, sell the extra back.",
+    )
 
 
 class CrossPlatformSpread(LegStrategy):

@@ -15,7 +15,7 @@ from pmsim.risk.negrisk import NegRiskGroup, groups_from_catalog
 from pmsim.risk.resolution import Resolution
 from pmsim.strategies.base import TokenMeta, end_ts_ms
 
-DataLabel = Literal["recorded", "synthetic"]
+DataLabel = Literal["recorded", "synthetic", "historical"]  # historical: real prices, model book
 
 
 @dataclass(frozen=True)

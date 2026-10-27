@@ -22,11 +22,36 @@ class MarketMakingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     tokens: list[str] = Field(default_factory=list)  # empty quotes every token seen
-    half_spread_ticks: int = Field(default=2, ge=1)
-    quote_shares: float = Field(default=50, gt=0)
-    max_inventory_shares: float = Field(default=500, gt=0)
-    skew_ticks_per_100: float = Field(default=1.0, ge=0)
-    requote_ticks: int = Field(default=1, ge=1)
+    half_spread_ticks: int = Field(
+        default=2,
+        ge=1,
+        title="Quote distance (ticks)",
+        description="How far from the mid price to place bids and offers.",
+    )
+    quote_shares: float = Field(
+        default=50,
+        gt=0,
+        title="Quote size",
+        description="Shares offered on each side.",
+    )
+    max_inventory_shares: float = Field(
+        default=500,
+        gt=0,
+        title="Inventory limit",
+        description="Stop bidding once you hold this many shares.",
+    )
+    skew_ticks_per_100: float = Field(
+        default=1.0,
+        ge=0,
+        title="Inventory skew",
+        description="Lower quotes this many ticks per 100 shares held, to sell down inventory.",
+    )
+    requote_ticks: int = Field(
+        default=1,
+        ge=1,
+        title="Requote after (ticks)",
+        description="Move a quote once the target price drifts this far.",
+    )
 
 
 class MarketMaker(Strategy):

@@ -29,10 +29,29 @@ SetSide = Literal["yes", "no"]
 class NegRiskSumConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    min_edge_usd_per_set: float = Field(default=0.01, ge=0)
-    max_sets: float = Field(default=50, gt=0)
-    leg_timeout_ms: int = Field(default=3_000, gt=0)
-    trade_no_sets: bool = True
+    min_edge_usd_per_set: float = Field(
+        default=0.01,
+        ge=0,
+        title="Minimum profit per set",
+        description="Only trade when a full set locks in at least this many dollars.",
+    )
+    max_sets: float = Field(
+        default=50,
+        gt=0,
+        title="Sets per trade",
+        description="Largest number of complete sets bought in one go.",
+    )
+    leg_timeout_ms: int = Field(
+        default=3_000,
+        gt=0,
+        title="Leg timeout (ms)",
+        description="If some outcomes fail to fill within this time, sell the extras back.",
+    )
+    trade_no_sets: bool = Field(
+        default=True,
+        title="Also trade NO sets",
+        description="Buy every NO when YES prices add up to more than $1.",
+    )
 
 
 class NegRiskSumArb(LegStrategy):

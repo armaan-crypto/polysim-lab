@@ -54,7 +54,8 @@ def test_meta_lists_strategies_and_data(cfg: Config) -> None:
     assert [s["name"] for s in m["strategies"]] == sorted(BUILDERS)
     comp = next(s for s in m["strategies"] if s["name"] == "complementary")
     edge = next(p for p in comp["params"] if p["name"] == "min_edge_usd_per_share")
-    assert edge == {"name": "min_edge_usd_per_share", "type": "float", "default": 0.005, "ge": 0}
+    assert edge["type"] == "float" and edge["default"] == 0.005 and edge["ge"] == 0
+    assert edge["title"] == "Minimum profit per share" and edge["help"]
     assert m["recorded"]["available"] and m["recorded"]["markets"] == 2
     assert m["stresses"][0] == "base"
 
@@ -194,8 +195,20 @@ def test_api_routes(client: httpx.Client) -> None:
 def test_api_errors(client: httpx.Client) -> None:
     bad = client.post("/api/run", json={"strategy": "nope"})
     assert bad.status_code == 400 and "unknown strategy" in bad.json()["error"]
-    assert client.post("/api/run", content=b"{not json").status_code == 400
+    json_type = {"Content-Type": "application/json"}
+    assert client.post("/api/run", content=b"{not json", headers=json_type).status_code == 400
     assert client.post("/api/run", json=[1]).status_code == 400
     assert client.post("/api/other", json={}).status_code == 404
-    big = client.post("/api/run", content=b"x" * 70_000)
-    assert big.status_code == 413
+    assert client.post("/api/run", content=b"x" * 70_000, headers=json_type).status_code == 413
+
+
+def test_request_guard(client: httpx.Client) -> None:
+    """Other websites and non-loopback hosts cannot drive the dashboard."""
+    assert client.post("/api/run", content=b"{}").status_code == 415  # form-style body
+    evil = client.post("/api/run", json={}, headers={"Origin": "https://evil.example"})
+    assert evil.status_code == 403
+    rebound = client.get("/api/meta", headers={"Host": "evil.example:8765"})
+    assert rebound.status_code == 403
+    host = client.base_url.netloc.decode()
+    same = client.post("/api/run", json={"strategy": "nope"}, headers={"Origin": f"http://{host}"})
+    assert same.status_code == 400

@@ -18,10 +18,30 @@ from pmsim.strategies.legs import LegManager, LegStrategy
 class ComplementaryConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    min_edge_usd_per_share: float = Field(default=0.005, ge=0)
-    max_shares: float = Field(default=100, gt=0)
-    max_position_shares: float = Field(default=1_000, gt=0)
-    leg_timeout_ms: int = Field(default=2_000, gt=0)
+    min_edge_usd_per_share: float = Field(
+        default=0.005,
+        ge=0,
+        title="Minimum profit per share",
+        description="Only trade when the pair locks in this many dollars per share after fees.",
+    )
+    max_shares: float = Field(
+        default=100,
+        gt=0,
+        title="Shares per trade",
+        description="Largest number of YES+NO pairs bought in one go.",
+    )
+    max_position_shares: float = Field(
+        default=1_000,
+        gt=0,
+        title="Position limit",
+        description="Stop buying a market once you hold this many shares of either side.",
+    )
+    leg_timeout_ms: int = Field(
+        default=2_000,
+        gt=0,
+        title="Leg timeout (ms)",
+        description="If only one side fills within this time, sell the extra side back.",
+    )
 
 
 class ComplementaryArb(LegStrategy):
