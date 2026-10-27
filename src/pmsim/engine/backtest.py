@@ -79,6 +79,10 @@ class BacktestResult:
     unwind_cost: int
     idle_cash_fraction: float
     resolutions: int
+    resolution_losses: int = 0
+    orders: int = 0
+    orders_filled: int = 0
+    edge_orders: int = 0  # orders that carried an expected edge (first legs, yield buys)
     decisions: list[Decision] = field(default_factory=list)
 
     @property
@@ -147,6 +151,8 @@ class Backtest:
         self.equity: list[tuple[int, int]] = []
         self.intents = 0
         self.expected_edge = 0
+        self.resolution_losses = 0
+        self.edge_orders = 0
         self.resolutions = sorted(self._perturb(uni.resolutions), key=lambda r: r.ts)
         trades: dict[str, list[TradePrint]] = {}
         for ev in data.events:
@@ -233,6 +239,10 @@ class Backtest:
         self._on_fills(self.engine.advance(res.ts))
         for token in (*res.payouts, *res.voided):
             self.engine.close_market(token, "market resolved")
+        for token, payout in res.payouts.items():
+            pos = self.portfolio.positions.get(token)
+            if pos is not None and pos.size and pos.size * payout < pos.cost:
+                self.resolution_losses += 1
         settle(self.portfolio, res, usd_to_cash(self.cfg.redeem_cost_usd))
         self._log("resolution", f"{res.kind} disputed={res.disputed} reversed={res.reversed}")
         self._submit(self.strategy.on_resolution(res))
@@ -256,6 +266,7 @@ class Backtest:
                 )
                 self.order_intent[order.id] = intent
                 self.expected_edge += intent.edge
+                self.edge_orders += intent.edge != 0
                 self._log("order", f"#{order.id} {intent}")
 
     def _unaffordable(self, intent: OrderIntent) -> str:
@@ -422,5 +433,9 @@ class Backtest:
             unwind_cost=legs.unwind_cost() if legs else 0,
             idle_cash_fraction=self.portfolio.idle_cash_fraction(),
             resolutions=len(self.resolutions),
+            resolution_losses=self.resolution_losses,
+            orders=len(self.order_intent),
+            edge_orders=self.edge_orders,
+            orders_filled=len({f.order_id for f in self.fills if f.order_id > 0}),
             decisions=self.decisions,
         )

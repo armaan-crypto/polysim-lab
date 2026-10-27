@@ -12,6 +12,7 @@ from pathlib import Path
 import websockets
 
 from pmsim import __version__
+from pmsim.analysis.report import write_report
 from pmsim.config import Config, load_config
 from pmsim.data.catalog import build_catalog, load_catalog, save_catalog, select_markets
 from pmsim.data.gamma import GammaClient
@@ -19,7 +20,14 @@ from pmsim.data.http import HttpClient, JsonCache
 from pmsim.data.recorder import ParquetSink, record
 from pmsim.data.synthetic import SyntheticConfig
 from pmsim.engine.backtest import BacktestConfig
-from pmsim.engine.experiment import DataSpec, RecordedSpec, RunSpec, run_one, stress_test
+from pmsim.engine.experiment import (
+    DataSpec,
+    RecordedSpec,
+    RunSpec,
+    run_full,
+    run_one,
+    stress_test,
+)
 from pmsim.strategies.registry import BUILDERS
 
 DEFAULT_CONFIG = Path("config/default.yaml")
@@ -50,6 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
     bt.add_argument("--params", default="{}", help="strategy parameters as JSON")
     bt.add_argument("--stress", action="store_true", help="also run the stress variants")
     bt.add_argument("--workers", type=int, default=1)
+    bt.add_argument("--report", type=Path, default=None, help="write an HTML report here")
     return parser
 
 
@@ -102,6 +111,9 @@ def cmd_backtest(cfg: Config, args: argparse.Namespace) -> int:
         results = list(report.results)
     else:
         results = [run_one(RunSpec.make(args.strategy, params, data, backtest=bt))]
+    if args.report is not None:
+        full = run_full(RunSpec.make(args.strategy, params, data, backtest=bt))
+        print(f"report written to {write_report(full, args.report)}")
     for r in results:
         print(
             f"[{r.label}] {r.strategy} {r.stress:11s} net PnL ${r.net_pnl_usd:,.2f}  "
