@@ -1,0 +1,54 @@
+{
+ "market": {
+  "can_close_early": true,
+  "close_time": "2026-11-10T23:00:00Z",
+  "created_time": "2026-10-27T07:03:52.623485Z",
+  "custom_strike": {
+   "tennis_competitor": "cb372496-3559-4a6b-97ef-5c065116a0b6"
+  },
+  "early_close_condition": "This market will close and expire after a winner is declared.",
+  "event_ticker": "KXITFMATCH-26OCT27BAKSAT",
+  "exchange_index": 3,
+  "expected_expiration_time": "2026-10-28T05:00:00Z",
+  "expiration_time": "2026-11-10T23:00:00Z",
+  "expiration_value": "",
+  "last_price_dollars": "0.0000",
+  "latest_expiration_time": "2026-11-10T23:00:00Z",
+  "market_type": "binary",
+  "no_ask_dollars": "0.9000",
+  "no_bid_dollars": "0.0800",
+  "no_sub_title": "Harrison Satara",
+  "notional_value_dollars": "1.0000",
+  "occurrence_datetime": "2026-10-28T05:00:00Z",
+  "open_interest_fp": "0.00",
+  "open_time": "2026-10-27T07:13:00Z",
+  "previous_price_dollars": "0.0000",
+  "previous_yes_ask_dollars": "0.0000",
+  "previous_yes_bid_dollars": "0.0000",
+  "price_level_structure": "linear_cent",
+  "price_ranges": [
+   {
+    "end": "1.0000",
+    "start": "0.0000",
+    "step": "0.0100"
+   }
+  ],
+  "result": "",
+  "rules_primary": "If Harrison Satara wins the Baker vs Satara professional tennis match in the 2026 M25 Tamworth Round of 32 after a ball has been played, then the market resolves to Yes.",
+  "rules_secondary": "The following market refers to the Baker vs Satara professional tennis match in the 2026 M25 Tamworth Round of 32 after a ball has been played. If the match does not occur (signaled by a ball being played) due to a player injury, walkover, forfeiture, or any other cancellation (all before the match starts), all markets will resolve to $0.50. If a player withdraws or forfeits after a match has started, that player will resolve to No. If this match is postponed or delayed, the market will remain open and close after the rescheduled match has finished (within two weeks).\n\nKalshi is not affiliated, associated, authorized, endorsed by, or in any way officially connected with the Governing League. All trademarks, logos, and brand names are the property of their respective owners.",
+  "settlement_bounds_type": "default",
+  "settlement_timer_seconds": 60,
+  "status": "active",
+  "strike_type": "structured",
+  "ticker": "KXITFMATCH-26OCT27BAKSAT-SAT",
+  "title": "Harrison Satara wins",
+  "updated_time": "2026-10-27T07:13:00.272369Z",
+  "volume_24h_fp": "0.00",
+  "volume_fp": "0.00",
+  "yes_ask_dollars": "0.9200",
+  "yes_ask_size_fp": "313.00",
+  "yes_bid_dollars": "0.1000",
+  "yes_bid_size_fp": "6.00",
+  "yes_sub_title": "Harrison Satara"
+ }
+}
