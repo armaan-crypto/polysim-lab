@@ -7,6 +7,7 @@ later raises `LookaheadError`.
 from __future__ import annotations
 
 from abc import ABC
+from bisect import bisect_right
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -91,22 +92,21 @@ class GuardedSeries[T]:
     def __init__(self, clock: Clock, items: Sequence[T], stamp: Callable[[T], int]) -> None:
         self._clock = clock
         self._items = sorted(items, key=stamp)
-        self._stamp = stamp
+        self._stamps = [stamp(x) for x in self._items]
 
     def __getitem__(self, i: int) -> T:
-        item = self._items[i]
-        self._clock.check(self._stamp(item), "series item")
-        return item
+        self._clock.check(self._stamps[i], "series item")
+        return self._items[i]
+
+    def _known(self) -> int:
+        return bisect_right(self._stamps, self._clock.now)
 
     def __iter__(self) -> Iterator[T]:
-        for item in self._items:
-            if self._stamp(item) > self._clock.now:
-                return
-            yield item
+        return iter(self._items[: self._known()])
 
     def latest(self) -> T | None:
-        past = list(self)
-        return past[-1] if past else None
+        n = self._known()
+        return self._items[n - 1] if n else None
 
 
 def known_at(ts: int, recv_ts: int) -> int:

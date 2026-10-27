@@ -287,3 +287,5 @@ def test_fill_engine_invariants(ops: list[tuple[object, ...]], rate: float) -> N
             assert 0 <= o.remaining <= o.req.size and o.queue_ahead >= 0
             assert (o.status == "filled") == (o.remaining == 0)
         assert all(used >= 0 for used in eng._consumed.values())
+        live = {o.id for o in eng.orders.values() if o.status in ("pending", "resting")}
+        assert {o.id for o in eng.open_orders()} == live

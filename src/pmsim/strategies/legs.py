@@ -8,6 +8,7 @@ fetched, fees included.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -51,6 +52,8 @@ class LegManager:
         self.groups: dict[str, LegGroup] = {}
         self.stats = LegStats()
         self._n = 0
+        self._open: dict[str, LegGroup] = {}
+        self._busy: Counter[str] = Counter()
 
     def open(
         self, prefix: str, legs: Sequence[OrderIntent], edge: int, now: int
@@ -71,16 +74,15 @@ class LegManager:
             )
             for i, leg in enumerate(legs)
         )
-        self.groups[gid] = LegGroup(gid, tagged, now + self.timeout_ms, edge)
+        group = LegGroup(gid, tagged, now + self.timeout_ms, edge)
+        self.groups[gid] = self._open[gid] = group
+        self._busy.update(leg.token for leg in tagged)
         self.stats.groups += 1
         return list(tagged)
 
     def busy(self, tokens: Sequence[str]) -> bool:
         """True if an open group already trades any of `tokens`."""
-        return any(
-            g.state == "open" and any(leg.token in tokens for leg in g.legs)
-            for g in self.groups.values()
-        )
+        return any(self._busy[t] for t in tokens)
 
     def on_fill(self, fill: Fill, intent: OrderIntent) -> None:
         group = self.groups.get(intent.group)
@@ -91,25 +93,29 @@ class LegManager:
             return
         group.filled[fill.token] = group.filled.get(fill.token, 0) + fill.size
         group.paid[fill.token] = group.paid.get(fill.token, 0) - fill.cash_delta
-        if all(group.filled.get(leg.token, 0) == leg.size for leg in group.legs):
-            group.state = "complete"
-            self.stats.complete += 1
+        if group.state == "open" and all(
+            group.filled.get(leg.token, 0) == leg.size for leg in group.legs
+        ):
+            self._finish(group, "complete")
 
     def on_timer(self, view: MarketView) -> list[Intent]:
         """Unwind groups past their deadline with unequal leg fills."""
         out: list[Intent] = []
-        for group in self.groups.values():
-            if group.state != "open" or view.now < group.deadline:
-                continue
+        for group in [g for g in self._open.values() if view.now >= g.deadline]:
             excess = {t: q for t, q in group.imbalance().items() if q > 0}
-            group.state = "failed" if excess else "complete"
-            if not excess:
-                self.stats.complete += 1
-                continue
-            self.stats.failed += 1
+            self._finish(group, "failed" if excess else "complete")
             for token, qty in excess.items():
                 out.extend(self._unwind(view, group, token, qty))
         return out
+
+    def _finish(self, group: LegGroup, state: str) -> None:
+        group.state = state
+        del self._open[group.id]
+        self._busy.subtract(leg.token for leg in group.legs)
+        if state == "complete":
+            self.stats.complete += 1
+        else:
+            self.stats.failed += 1
 
     def unwind_cost(self) -> int:
         """Total unwind cost so far. Unsold excess counts as a full loss of its basis."""

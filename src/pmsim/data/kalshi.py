@@ -6,6 +6,7 @@ Kalshi books list bids only, for YES and NO. A YES ask at p is a NO bid at
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol
@@ -99,7 +100,8 @@ class MockQuoteFeed:
 
     def __init__(self, quotes: Mapping[str, Sequence[Quote]]) -> None:
         self._quotes = {t: sorted(q, key=lambda x: x.ts) for t, q in quotes.items()}
+        self._stamps = {t: [x.ts for x in q] for t, q in self._quotes.items()}
 
     def quote(self, ticker: str, now: int) -> Quote | None:
-        past = [q for q in self._quotes.get(ticker, ()) if q.ts <= now]
-        return past[-1] if past else None
+        i = bisect_right(self._stamps.get(ticker, []), now)
+        return self._quotes[ticker][i - 1] if i else None

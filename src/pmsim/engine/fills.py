@@ -81,12 +81,14 @@ class FillEngine:
         self._consumed: dict[tuple[str, Side, int], int] = {}
         self._pending: list[tuple[int, int, str, int]] = []
         self._seq = 0
+        self._open: dict[str, dict[int, SimOrder]] = {}  # token -> open orders by id
 
     # ---- requests -------------------------------------------------------
 
     def submit(self, req: OrderRequest, now: int) -> SimOrder:
         order = SimOrder(len(self.orders) + 1, req, now, req.size)
         self.orders[order.id] = order
+        self._open.setdefault(req.token, {})[order.id] = order
         self._schedule(now + self.latency_ms, "activate", order.id)
         return order
 
@@ -100,14 +102,15 @@ class FillEngine:
     def close_market(self, token: str, reason: str) -> None:
         """Exchange side: trading stopped, every open order on `token` is cancelled now."""
         for order in self.open_orders(token):
-            order.status, order.reason = "cancelled", reason
+            self._close(order, "cancelled", reason)
 
     def open_orders(self, token: str | None = None) -> list[SimOrder]:
-        return [
-            o
-            for o in self.orders.values()
-            if o.status in OPEN and (token is None or o.req.token == token)
-        ]
+        """Live (pending or resting) orders, oldest first."""
+        if token is not None:
+            return list(self._open.get(token, {}).values())
+        return sorted(
+            (o for book in self._open.values() for o in book.values()), key=lambda o: o.id
+        )
 
     # ---- time and market data ---------------------------------------------
 
@@ -139,6 +142,11 @@ class FillEngine:
 
     # ---- internals ----------------------------------------------------------
 
+    def _close(self, order: SimOrder, status: OrderStatus, reason: str = "") -> None:
+        """Move an order to a final status and drop it from the open index."""
+        order.status, order.reason = status, reason or order.reason
+        self._open.get(order.req.token, {}).pop(order.id, None)
+
     def _schedule(self, at: int, action: str, order_id: int) -> None:
         self._seq += 1
         heapq.heappush(self._pending, (at, self._seq, action, order_id))
@@ -154,7 +162,7 @@ class FillEngine:
             if action == "activate":
                 fills.extend(self._activate(order, at))
             elif order.status in OPEN:
-                order.status, order.reason = "cancelled", "cancel request"
+                self._close(order, "cancelled", "cancel request")
         return fills
 
     def _reject_reason(self, order: SimOrder) -> str:
@@ -176,7 +184,7 @@ class FillEngine:
         if order.status != "pending":
             return []
         if reason := self._reject_reason(order):
-            order.status, order.reason = "rejected", reason
+            self._close(order, "rejected", reason)
             return []
         req = order.req
         opp = opposite(req.side)
@@ -187,7 +195,7 @@ class FillEngine:
             if crosses(req.side, req.price, p)
         ]
         if req.tif == "FOK" and sum(v for _, v in levels) < order.remaining:
-            order.status, order.reason = "cancelled", "FOK not fully fillable"
+            self._close(order, "cancelled", "FOK not fully fillable")
             return []
         fills = []
         for price, avail in levels:
@@ -200,9 +208,9 @@ class FillEngine:
             if order.remaining == 0:
                 break
         if order.remaining == 0:
-            order.status = "filled"
+            self._close(order, "filled")
         elif req.tif != "GTC":
-            order.status, order.reason = "cancelled", f"{req.tif} remainder"
+            self._close(order, "cancelled", f"{req.tif} remainder")
         else:
             order.status = "resting"
             order.queue_ahead = self.visible(req.token, req.side, req.price)
@@ -211,7 +219,7 @@ class FillEngine:
     def _fill(self, order: SimOrder, price: int, qty: int, ts: int, liq: Liquidity) -> Fill:
         order.remaining -= qty
         if order.remaining == 0:
-            order.status = "filled"
+            self._close(order, "filled")
         fee = self.rules[order.req.token].fees.fee(price, qty, liq)
         return Fill(
             order.id, order.req.token, order.req.side, price, qty, ts, liq, fee, self.gas_cash
