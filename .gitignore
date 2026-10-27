@@ -12,3 +12,4 @@ reports/
 data/cache/
 data/catalog.parquet
 data/paper/
+.claude/launch.json

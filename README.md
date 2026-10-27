@@ -30,6 +30,29 @@ flowchart LR
     W -.paper mode.-> BT
 ```
 
+## Dashboard
+
+```
+uv run pmsim ui          # opens http://127.0.0.1:8765
+```
+
+A local web dashboard with a Polymarket-inspired look (its own styling, not
+Polymarket's assets; not affiliated):
+
+- **Markets**: catalog grouped by event with chance, Yes/No prices and 24 h
+  volume from the last `pmsim fetch`; click a market for its recorded order
+  book.
+- **Backtest**: pick a strategy, synthetic or recorded data and parameters;
+  see PnL, risk metrics, the equity curve, stress tests, theory vs realized
+  edge, every trade and every rejected order.
+- **Compare**: all six strategies on the same data, theory vs realized.
+- **Paper trading**: live view of `pmsim paper` sessions, refreshed every 3 s.
+
+Links like `#backtest?strategy=logical&hours=6&stress=1&run=1` or
+`#markets?q=fed` open a configured view. It follows the system light or dark
+setting; the Theme button overrides it. The server binds to 127.0.0.1 and only
+runs simulations and reads local files.
+
 ## How to run it
 
 Requirements: Python 3.12+ and [uv](https://docs.astral.sh/uv/).

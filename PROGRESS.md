@@ -90,6 +90,9 @@ Notes, read before quoting any number above:
 
 (newest first; one line per session: UTC time, phase, result)
 
+- 2026-10-27T14:42Z: Added the local dashboard (`pmsim ui`, user request after STATUS DONE): Polymarket-style
+  markets view with recorded order books, backtest, compare and paper views; JSON API with tests
+  (222 tests, `make check` passes). Catalog now stores prices, volume, icons and event titles.
 - 2026-10-27T08:25Z: Phase 8 and final review done, `make check` passes (202 tests, coverage gate 85%,
   actual 97.7%). Profiling found full scans of all orders, quotes and leg groups; indexing and
   binary search made runs about 7x faster and a 24 h synthetic day replays in under 8 s.

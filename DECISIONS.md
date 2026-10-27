@@ -77,3 +77,10 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: Leg manager tracks only open groups plus a per-token busy counter. Scanning all historical groups made long runs quadratic.
 - 2026-10-27: `make check` enforces 85% coverage on `pmsim.engine` and `pmsim.book` (portfolio lives in engine). The spec's floor, checked every run.
 - 2026-10-27: Recorded sample check: 78/78 binary markets had mirrored YES/NO books, 0 with ask sum < $1. Documented in LIMITATIONS: complementary arbitrage looks structurally absent.
+- 2026-10-27: Dashboard is a standard-library HTTP server plus one static page (vanilla JS, SVG charts). No new dependencies or build step; works offline except for market icons.
+- 2026-10-27: Dashboard API logic lives in plain functions (`pmsim.ui.api`); the server only routes. Testable without sockets.
+- 2026-10-27: Server binds to 127.0.0.1 and serializes runs with a lock. Runs are CPU-bound; one at a time keeps timings honest.
+- 2026-10-27: Look is Polymarket-inspired (navy dark mode, blue accent, green Yes, red No, chance gauges), built from our own CSS. No Polymarket logo or name as branding; the footer says it is not affiliated.
+- 2026-10-27: Catalog gains Gamma's `outcomePrices`, `volume24hr`, `volumeNum`, `icon` (falling back to the event icon) and the event title, so market cards show real prices as of the last fetch.
+- 2026-10-27: Decision-log lines are plain text ("BUY 50.00 @ 99.1c GTC token") instead of Python reprs. Easier to read in the paper log and the UI.
+- 2026-10-27: Trade times in the UI are elapsed since run start; synthetic clocks start at 0, so wall-clock times would mislead.

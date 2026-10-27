@@ -224,8 +224,8 @@ function eventCard(ev, index) {
   if (single) {
     const [yesName, noName] = m0.outcomes;
     body = `<div class="yesno">
-      <span class="y">${esc(yesName)} <b class="num">${fmt.cents(m0.yes_price)}</b></span>
-      <span class="n">${esc(noName)} <b class="num">${fmt.cents(m0.no_price)}</b></span>
+      <span class="y"><em>${esc(yesName)}</em> <b class="num">${fmt.cents(m0.yes_price)}</b></span>
+      <span class="n"><em>${esc(noName)}</em> <b class="num">${fmt.cents(m0.no_price)}</b></span>
     </div>`;
   } else {
     const rows = ev.markets.slice(0, 3).map((m) => `

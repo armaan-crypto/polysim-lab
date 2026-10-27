@@ -311,6 +311,9 @@ td.right, th.right { text-align: right; }
   display: flex; justify-content: center; align-items: center; gap: 6px;
   height: 38px; border-radius: var(--r-ctl); font-weight: 650;
 }
+.yesno span { padding: 0 10px; min-width: 0; }
+.yesno em { font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.yesno b { flex: none; }
 .yesno .y { background: var(--yes-soft); color: var(--yes); }
 .yesno .n { background: var(--no-soft); color: var(--no); }
 .card-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px;
