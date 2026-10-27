@@ -38,7 +38,7 @@ Details for each phase are in docs/BUILD_SPEC.md.
 
 (newest first; one line per session: UTC time, phase, result)
 
-- 2026-10-27T07:35Z: Phase 2 done, `make check` passes (92 tests, hypothesis properties for L2, L3 and
+- 2026-10-27T07:15Z: Phase 2 done, `make check` passes (92 tests, hypothesis properties for L2, L3 and
   the fill engine). Property test found an unknown-id cancel crash, fixed. Live replay of a 20 s
   recording matches the feed's best bid/ask on 160/160 tokens. Next: Phase 3 (portfolio, resolution).
 - 2026-10-27T07:10Z: Phase 1 done, `make check` passes (45 tests). Network reachable; fixtures
