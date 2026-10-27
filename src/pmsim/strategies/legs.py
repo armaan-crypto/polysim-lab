@@ -87,7 +87,7 @@ class LegManager:
         if group is None:
             return
         if intent.tag == "unwind":
-            group.unwind_proceeds += -fill.cash_delta
+            group.unwind_proceeds += fill.cash_delta
             return
         group.filled[fill.token] = group.filled.get(fill.token, 0) + fill.size
         group.paid[fill.token] = group.paid.get(fill.token, 0) - fill.cash_delta

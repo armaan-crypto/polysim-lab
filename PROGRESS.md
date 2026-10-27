@@ -1,5 +1,5 @@
 STATUS: IN_PROGRESS
-LOCK: 2026-10-27T07:27Z
+LOCK: 2026-10-27T07:35Z
 
 # Progress
 
@@ -11,7 +11,7 @@ Details for each phase are in docs/BUILD_SPEC.md.
 - [x] Phase 1: Data layer (Gamma and CLOB clients, recorder, catalog, fixtures, CLI)
 - [x] Phase 2: Order book and matching engine (book, replay, fills, fees, property tests)
 - [x] Phase 3: Portfolio, resolution and accounting (PnL, resolution risk, neg-risk)
-- [ ] Phase 4: Strategy framework (interface, lookahead guard, six reference strategies)
+- [x] Phase 4: Strategy framework (interface, lookahead guard, six reference strategies)
 - [ ] Phase 5: Backtester and experiment runner (event-driven, sweeps, synthetic data, stress)
 - [ ] Phase 6: Metrics and reports (metrics, theory vs realized edge, HTML report)
 - [ ] Phase 7: Paper trading mode (live feed, no-order guard test)
@@ -33,11 +33,17 @@ Details for each phase are in docs/BUILD_SPEC.md.
 - `tick_size_change` frames: parser built from the docs example; none seen live.
 - Fill model queue estimates and latency have not been compared with real fills (no real orders, by design).
   Resting orders can only fill from trade prints; the WS trade `side` meaning is unverified.
+- Kalshi taker fee schedule: assumed 0.07 * C * p * (1 - p). Check the Kalshi fee schedule.
+- Kalshi public endpoints reached from this machine; fixtures recorded. The client is untested against
+  pagination and rate limits.
 
 ## Session log
 
 (newest first; one line per session: UTC time, phase, result)
 
+- 2026-10-27T07:35Z: Phase 4 done, `make check` passes (156 tests). Strategy interface, lookahead guard, leg
+  manager with unwinds, six reference strategies, Kalshi read-only client and mock feed. Tests
+  caught an unwind-proceeds sign bug. Next: Phase 5 (backtester, synthetic data, stress tests).
 - 2026-10-27T07:27Z: Phase 3 done, `make check` passes. Portfolio (average cost, PnL, lock-up, idle cash, merge,
   neg-risk conversion), resolution payouts and settlement, seeded resolution-risk simulator with
   per-class profiles (assumed probabilities, documented UMA timings). Next: Phase 4 (strategies).

@@ -41,3 +41,14 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: Resolution timing from the UMA docs: 2 h challenge, 4 to 6 days when disputed (118 extra hours, so about 5 days total). Probabilities of late proposals, disputes and reversals are labeled assumptions per market class.
 - 2026-10-27: Market class = first configured class whose tags the market carries, else "default". Class profiles only override the fields they set.
 - 2026-10-27: Catalog gains event_id, neg_risk_market_id, group_item_title and neg_risk_other (from Gamma). Needed to build neg-risk groups.
+- 2026-10-27: Strategy handlers take one argument as the spec says; market state comes from a read-only `MarketView` bound by the runner. Handlers stay pure and testable.
+- 2026-10-27: Added `on_fill` and `on_external_fill` handlers. Multi-leg and market-making strategies need to know what filled.
+- 2026-10-27: Lookahead guard: a runner-owned `Clock` plus `GuardedSeries`. Reads of anything stamped after now raise `LookaheadError`. Data is known at max(exchange ts, receive ts).
+- 2026-10-27: Arbitrage legs go out as IOC at the best ask, sized to the smallest top-of-book depth. Pays real depth and never rests a half-hedged leg.
+- 2026-10-27: Leg risk: at the group deadline, excess on over-filled legs is sold IOC at best bid minus `unwind_ticks`. With no bid the excess is held to resolution. Unwind cost = basis of the excess minus proceeds.
+- 2026-10-27: Neg-risk sum arb buys the YES set (pays $1) or the NO set (pays $(n-1)). Groups with an explicit "Other" market are skipped, per the docs.
+- 2026-10-27: Near-resolution filter is a transparent keyword score. "consensus of credible reporting" is downweighted to 0.25: it is boilerplate in about 60% of live rules.
+- 2026-10-27: Logical relations are curated by hand in config. Inferring implication from text is error-prone.
+- 2026-10-27: Market maker sells only inventory it holds (no shorting on Polymarket), quotes post-only, and skews linearly against inventory.
+- 2026-10-27: Kalshi: read-only client plus a mock quote feed. YES ask = 1 - best NO bid (docs). Kalshi fee rate is a config assumption (0.07, same form as Polymarket); the docs pages found give rounding, not the schedule.
+- 2026-10-27: Cross-platform mismatch score: 0.7 * (1 - Jaccard of numbers, months and source domains) + 0.3 * end-date gap over 7 days. A penalty of lambda * m per share comes off the edge.
