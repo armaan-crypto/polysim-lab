@@ -17,6 +17,16 @@ Details for each phase are in docs/BUILD_SPEC.md.
 - [ ] Phase 7: Paper trading mode (live feed, no-order guard test)
 - [ ] Phase 8: Hardening (coverage, profiling, ASSUMPTIONS.md, LIMITATIONS.md)
 
+## Current work (resume here if a session stopped mid-phase)
+
+Phase 5 plan: `data/synthetic.py` (seeded generator: random-walk books, flash gaps, stale quotes,
+thin depth, halts, injected mispricings, resolutions; label "synthetic"), `engine/backtest.py`
+(event loop: FillEngine + Portfolio + Strategy via MarketView, timers, resolutions, cash and share
+reservation, mock external venue, equity curve, decision log), `strategies/registry.py`,
+`engine/experiment.py` (sweeps, walk-forward, process-pool parallel runs, stress variants:
+latency x3, depth x0.5, fees x2; pass = positive in base and every single stress), and
+`pmsim backtest` CLI. Check `git log` for which of these already landed.
+
 ## Final review (after Phase 8)
 
 - [ ] Run `make check` and the full test suite
