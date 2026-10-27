@@ -41,6 +41,17 @@ def test_gamma_by_slug_missing(make_http: MakeHttp) -> None:
     assert seen[0].url.params["slug"] == "nope"
 
 
+def test_gamma_tolerates_missing_optional_fields(make_http: MakeHttp) -> None:
+    """Seen live: feeSchedule, resolutionSource and endDate absent, feeType null."""
+    raw = load_fixture("gamma_markets.json")
+    for key in ("feeSchedule", "resolutionSource", "endDate"):
+        raw[0].pop(key)
+    raw[0]["feeType"] = None
+    http, _ = make_http({"/markets": raw})
+    m = GammaClient(http, "https://g").list_markets()[0]
+    assert m.fee_type is None and m.fee_schedule.rate == 0 and m.end_date is None
+
+
 def test_gamma_skips_markets_without_tokens(make_http: MakeHttp) -> None:
     raw = load_fixture("gamma_markets.json")
     raw[0] = {**raw[0], "clobTokenIds": None}

@@ -49,7 +49,7 @@ class Market(_Api):
     tick_size: float = Field(alias="orderPriceMinTickSize")
     min_order_size: float = Field(alias="orderMinSize")
     fees_enabled: bool = Field(default=False, alias="feesEnabled")
-    fee_type: str = Field(default="", alias="feeType")
+    fee_type: str | None = Field(default=None, alias="feeType")  # null on some live markets
     fee_schedule: FeeSchedule = Field(default_factory=FeeSchedule, alias="feeSchedule")
     active: bool = False
     closed: bool = False
