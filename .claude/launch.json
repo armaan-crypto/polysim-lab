@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pmsim-ui",
+      "runtimeExecutable": "/Users/armaan/Library/Python/3.13/bin/uv",
+      "runtimeArgs": [
+        "run",
+        "pmsim",
+        "ui",
+        "--no-browser",
+        "--port",
+        "8765"
+      ],
+      "port": 8765,
+      "url": "http://127.0.0.1:8765"
+    }
+  ]
+}

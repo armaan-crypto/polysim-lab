@@ -74,7 +74,12 @@ class Market(_Api):
         """Gamma nests the parent event as `events: [{"id": ..., "title": ...}]`."""
         if isinstance(data, dict) and data.get("events"):
             event = data["events"][0]
-            data = {**data, "event_id": str(event["id"]), "event_title": event.get("title", "")}
+            data = {
+                **data,
+                "event_id": str(event["id"]),
+                "event_title": event.get("title", ""),
+                "icon": data.get("icon") or event.get("icon"),
+            }
         return data
 
 

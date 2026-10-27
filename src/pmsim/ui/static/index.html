@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>polysim</title>
+  <link rel="stylesheet" href="app.css">
+  <script>
+    try {
+      const t = localStorage.getItem("pmsim-theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-row">
+      <div class="brand">
+        <span class="brand-name">polysim</span>
+        <span class="brand-tag">Simulator</span>
+      </div>
+      <label class="search">
+        <input id="search" type="search" placeholder="Search markets" aria-label="Search markets" autocomplete="off">
+      </label>
+      <div class="top-actions">
+        <span class="data-status" id="data-status"></span>
+        <button class="ghost-btn" id="theme-btn" type="button" aria-label="Switch theme">Theme: auto</button>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab" role="tab" data-view="markets">Markets</button>
+      <button class="tab" role="tab" data-view="backtest">Backtest</button>
+      <button class="tab" role="tab" data-view="compare">Compare</button>
+      <button class="tab" role="tab" data-view="paper">Paper trading</button>
+    </nav>
+  </header>
+
+  <main id="app" aria-live="polite"></main>
+  <div id="drawer-root"></div>
+
+  <footer>
+    polysim is a local research simulator. It is not affiliated with Polymarket and never places orders.
+    Prices on market cards are a snapshot from the last <span class="num">pmsim fetch</span>.
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

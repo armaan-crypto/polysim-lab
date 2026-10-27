@@ -16,7 +16,7 @@ from dataclasses import dataclass, field, replace
 from pydantic import BaseModel, ConfigDict, Field
 
 from pmsim.book.replay import BookDelta, BookSnapshot, MarketEvent, TickChange, TradePrint
-from pmsim.book.units import CASH_SCALE, PRICE_SCALE, Side, usd_to_cash
+from pmsim.book.units import CASH_SCALE, PRICE_SCALE, SIZE_SCALE, Side, usd_to_cash
 from pmsim.config import ResolutionRisk
 from pmsim.data.kalshi import leg_token
 from pmsim.engine.fees import FeeModel
@@ -92,6 +92,26 @@ class BacktestResult:
 
     def net_pnl_usd(self) -> float:
         return self.net_pnl / CASH_SCALE
+
+
+def _shares(size: int) -> str:
+    return f"{size / SIZE_SCALE:,.2f}"
+
+
+def _cents(price: int) -> str:
+    return f"{price * 100 / PRICE_SCALE:g}c"
+
+
+def describe(intent: Intent) -> str:
+    """One readable line for the decision log."""
+    if isinstance(intent, CancelIntent):
+        return f"cancel #{intent.order_id}"
+    if isinstance(intent, ExternalIntent):
+        size, price = _shares(intent.size), _cents(intent.price)
+        return f"{intent.venue} {intent.side} {intent.outcome} {size} @ {price} {intent.ticker}"
+    group = f" [{intent.group}]" if intent.group else ""
+    size, price = _shares(intent.size), _cents(intent.price)
+    return f"{intent.side} {size} @ {price} {intent.tif} {intent.token}{group}"
 
 
 def _same_time(events: list[MarketEvent]) -> Iterator[list[MarketEvent]]:
@@ -285,7 +305,7 @@ class Backtest:
                 self.edge_orders += intent.edge != 0
                 edge = intent.edge / CASH_SCALE
                 why = f"{self.strategy.name}:{intent.tag or 'order'} edge ${edge:.4f}"
-                self._log("order", f"#{order.id} {intent}", why)
+                self._log("order", f"#{order.id} {describe(intent)}", why)
 
     def _unaffordable(self, intent: OrderIntent) -> str:
         rules = self.engine.rules.get(intent.token)
@@ -319,9 +339,10 @@ class Backtest:
         for fill in fills:
             self._apply(fill)
             intent = self.order_intent[fill.order_id]
+            size, price = _shares(fill.size), _cents(fill.price)
             self._log(
                 "fill",
-                f"#{fill.order_id} {fill.side} {fill.size}@{fill.price}",
+                f"#{fill.order_id} {fill.side} {size} @ {price} {fill.token}",
                 f"{fill.liquidity} fill under the fill model",
             )
             self._submit(self.strategy.on_fill(fill, intent))
@@ -349,14 +370,16 @@ class Backtest:
             return
         token = leg_token(intent.ticker, intent.outcome)
         self._apply(Fill(-1, token, "BUY", ask, qty, arrive, "taker", fee, 0))
-        self._log("external_fill", f"{token} {qty}@{ask}", "mock venue filled at its quote")
+        self._log(
+            "external_fill", f"BUY {_shares(qty)} @ {_cents(ask)} {token}", "mock venue quote"
+        )
         self._submit(self.strategy.on_external_fill(intent, qty, ask))
 
     # ---- bookkeeping -------------------------------------------------------------
 
     def _reject(self, reason: str, intent: Intent) -> None:
         self.rejects[reason] += 1
-        self._log("reject", f"{intent}", reason)
+        self._log("reject", describe(intent), reason)
 
     def _log(self, kind: str, detail: str, reason: str) -> None:
         self.decisions.append(Decision(self.clock.now, kind, detail, reason))
