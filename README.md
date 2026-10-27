@@ -32,9 +32,8 @@ make check
 uv run pmsim --version
 uv run pmsim fetch --limit 500                                # market catalog -> data/catalog.parquet
 uv run pmsim record --markets "tag:fed,neg_risk" --hours 1    # books + trades -> data/raw/<table>/
+uv run pmsim backtest --strategy complementary --stress       # synthetic data, labeled as such
 ```
-
-uv run pmsim backtest --strategy complementary --stress    # synthetic data, labeled as such
 
 `--markets` takes comma separated terms (OR-ed): a slug substring, `tag:<slug>`,
 or `neg_risk`. Only open markets are recorded. Recorded tables are
