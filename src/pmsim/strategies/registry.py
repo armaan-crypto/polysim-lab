@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from pydantic import BaseModel
+
 from pmsim.data.kalshi import MockQuoteFeed
 from pmsim.engine.universe import Universe
 from pmsim.strategies.base import Strategy
@@ -52,6 +54,43 @@ BUILDERS: dict[str, Callable[[Params, Universe], Strategy]] = {
     "logical": _logical,
     "market_making": lambda p, _: MarketMaker(MarketMakingConfig.model_validate(p)),
     "cross_platform": _cross,
+}
+
+
+CONFIGS: dict[str, type[BaseModel]] = {
+    "complementary": ComplementaryConfig,
+    "negrisk_sum": NegRiskSumConfig,
+    "near_resolution": NearResolutionConfig,
+    "logical": LogicalConfig,
+    "market_making": MarketMakingConfig,
+    "cross_platform": CrossPlatformConfig,
+}
+
+DESCRIPTIONS: dict[str, tuple[str, str]] = {
+    "complementary": (
+        "Complementary arbitrage",
+        "Buys YES and NO of one market when the pair costs under $1 after fees and gas.",
+    ),
+    "negrisk_sum": (
+        "Neg-risk sum arbitrage",
+        "Buys every YES (or every NO) in a mutually exclusive group when the set is mispriced.",
+    ),
+    "near_resolution": (
+        "Near-resolution yield",
+        "Buys 0.95 to 0.99 outcomes close to the end date when the rules text looks clean.",
+    ),
+    "logical": (
+        "Logical arbitrage",
+        "Buys NO on a subset event and YES on its superset when prices break the implication.",
+    ),
+    "market_making": (
+        "Market making",
+        "Quotes both sides around the mid, skewed against inventory, post only.",
+    ),
+    "cross_platform": (
+        "Cross-platform spread",
+        "Pairs a Polymarket leg with the opposite Kalshi leg when the two cost under $1.",
+    ),
 }
 
 

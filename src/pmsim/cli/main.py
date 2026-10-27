@@ -35,6 +35,7 @@ from pmsim.engine.experiment import (
 from pmsim.engine.paper import PaperSink
 from pmsim.engine.universe import MarketData, universe_from_catalog
 from pmsim.strategies.registry import BUILDERS, build_strategy
+from pmsim.ui.server import serve
 
 DEFAULT_CONFIG = Path("config/default.yaml")
 
@@ -72,6 +73,11 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--hours", type=float, required=True)
     pp.add_argument("--params", default="{}", help="strategy parameters as JSON")
     pp.add_argument("--session", default="paper", help="name for the state and log files")
+
+    ui = sub.add_parser("ui", help="open the local dashboard")
+    ui.add_argument("--host", default="127.0.0.1")
+    ui.add_argument("--port", type=int, default=8765)
+    ui.add_argument("--no-browser", action="store_true", help="do not open a browser tab")
 
     ed = sub.add_parser("edges", help="theoretical vs realized edge for every strategy")
     ed.add_argument("--data", choices=["synthetic", "recorded"], default="synthetic")
@@ -197,6 +203,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return cmd_fetch(cfg, args.limit, args.closed)
     if args.command == "record":
         return cmd_record(cfg, args.markets, args.hours)
+    if args.command == "ui":
+        serve(cfg, args.host, args.port, not args.no_browser)
+        return 0
     if args.command == "paper":
         return cmd_paper(cfg, args)
     if args.command == "edges":
