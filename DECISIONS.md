@@ -52,3 +52,13 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: Market maker sells only inventory it holds (no shorting on Polymarket), quotes post-only, and skews linearly against inventory.
 - 2026-10-27: Kalshi: read-only client plus a mock quote feed. YES ask = 1 - best NO bid (docs). Kalshi fee rate is a config assumption (0.07, same form as Polymarket); the docs pages found give rounding, not the schedule.
 - 2026-10-27: Cross-platform mismatch score: 0.7 * (1 - Jaccard of numbers, months and source domains) + 0.3 * end-date gap over 7 days. A penalty of lambda * m per share comes off the edge.
+- 2026-10-27: Backtest applies all events with one timestamp before strategies react, once per touched token. One feed message often moves YES and NO together; reacting in between showed a fake arbitrage (found in the first synthetic run).
+- 2026-10-27: The strategy book view shows depth net of what we already took (`FillEngine.visible`). Without it a strategy re-reads liquidity it consumed on a frozen book and its legs fail.
+- 2026-10-27: Cash and shares are reserved for open orders before a new intent is accepted. The venue refuses orders the account cannot cover.
+- 2026-10-27: Fills from different queues (engine and mock Kalshi venue) can be a few ms out of order; they are booked at the portfolio's current time. Only time integrals shift, never cash.
+- 2026-10-27: Mock external venue fills at the quote seen at arrival (now + latency), up to quoted size, if the limit allows.
+- 2026-10-27: Resolution risk in backtests is optional (`resolution_risk`), seeded by `seed`. It is the only randomness inside a run.
+- 2026-10-27: Synthetic default fee rate 0.05 (docs "Other / General"). With 0 fees the double-fee stress was vacuous.
+- 2026-10-27: Stress pass rule: net PnL > 0 in base and in each single stress (latency x3, depth x0.5, fees x2).
+- 2026-10-27: Parallel runs use a process pool over picklable RunSpecs; results come back in spec order, so serial and parallel agree (tested).
+- 2026-10-27: Walk-forward: time split into folds + 1 equal windows; tune on window k by net PnL, test on window k + 1.

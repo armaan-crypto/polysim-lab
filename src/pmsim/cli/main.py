@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -16,6 +17,10 @@ from pmsim.data.catalog import build_catalog, load_catalog, save_catalog, select
 from pmsim.data.gamma import GammaClient
 from pmsim.data.http import HttpClient, JsonCache
 from pmsim.data.recorder import ParquetSink, record
+from pmsim.data.synthetic import SyntheticConfig
+from pmsim.engine.backtest import BacktestConfig
+from pmsim.engine.experiment import DataSpec, RecordedSpec, RunSpec, run_one, stress_test
+from pmsim.strategies.registry import BUILDERS
 
 DEFAULT_CONFIG = Path("config/default.yaml")
 
@@ -36,6 +41,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--markets", required=True, help="filter: slug substrings, tag:<slug>, neg_risk"
     )
     rec.add_argument("--hours", type=float, required=True, help="recording duration in hours")
+
+    bt = sub.add_parser("backtest", help="run one strategy, optionally with stress tests")
+    bt.add_argument("--strategy", required=True, choices=sorted(BUILDERS))
+    bt.add_argument("--data", choices=["synthetic", "recorded"], default="synthetic")
+    bt.add_argument("--seed", type=int, default=None, help="synthetic data seed")
+    bt.add_argument("--hours", type=float, default=6.0, help="synthetic duration in hours")
+    bt.add_argument("--params", default="{}", help="strategy parameters as JSON")
+    bt.add_argument("--stress", action="store_true", help="also run the stress variants")
+    bt.add_argument("--workers", type=int, default=1)
     return parser
 
 
@@ -73,6 +87,33 @@ def cmd_record(cfg: Config, spec: str, hours: float) -> int:
     return 0
 
 
+def _data_spec(cfg: Config, kind: str, seed: int | None, hours: float) -> DataSpec:
+    if kind == "recorded":
+        return RecordedSpec(str(cfg.data_dir))
+    return SyntheticConfig(seed=cfg.seed if seed is None else seed, duration_hours=hours)
+
+
+def cmd_backtest(cfg: Config, args: argparse.Namespace) -> int:
+    params = json.loads(args.params)
+    data = _data_spec(cfg, args.data, args.seed, args.hours)
+    bt = BacktestConfig(latency_ms=cfg.latency_ms, gas_per_trade_usd=cfg.fees.gas_per_trade_usd)
+    if args.stress:
+        report = stress_test(args.strategy, params, data, bt, args.workers)
+        results = list(report.results)
+    else:
+        results = [run_one(RunSpec.make(args.strategy, params, data, backtest=bt))]
+    for r in results:
+        print(
+            f"[{r.label}] {r.strategy} {r.stress:11s} net PnL ${r.net_pnl_usd:,.2f}  "
+            f"fills {r.fills}  expected edge ${r.expected_edge_usd:,.2f}  "
+            f"leg failures {r.leg_failures}  rejects {r.rejects}"
+        )
+    if args.stress:
+        verdict = "PASSED" if report.passed else "FAILED"
+        print(f"stress test {verdict} ({report.label} data)")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and return an exit code."""
     args = build_parser().parse_args(argv)
@@ -81,4 +122,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     cfg = _config(args.config)
     if args.command == "fetch":
         return cmd_fetch(cfg, args.limit, args.closed)
-    return cmd_record(cfg, args.markets, args.hours)
+    if args.command == "record":
+        return cmd_record(cfg, args.markets, args.hours)
+    return cmd_backtest(cfg, args)

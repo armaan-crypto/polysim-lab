@@ -51,7 +51,7 @@ class SyntheticConfig(BaseModel):
     p_mispricing: float = Field(default=0.01, ge=0, le=1)
     mispricing_ticks: int = Field(default=3, ge=1)
     trades_per_step: float = Field(default=0.5, ge=0)
-    fee_rate: float = Field(default=0.0, ge=0)
+    fee_rate: float = Field(default=0.05, ge=0)  # docs "Other / General" taker rate
     kalshi_noise: float = Field(default=0.02, ge=0)
     p_kalshi_disagree: float = Field(default=0.02, ge=0, le=1)  # rule mismatch risk
 

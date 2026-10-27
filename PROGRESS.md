@@ -1,5 +1,5 @@
 STATUS: IN_PROGRESS
-LOCK: 2026-10-27T07:35Z
+LOCK: 2026-10-27T07:49Z
 
 # Progress
 
@@ -12,20 +12,35 @@ Details for each phase are in docs/BUILD_SPEC.md.
 - [x] Phase 2: Order book and matching engine (book, replay, fills, fees, property tests)
 - [x] Phase 3: Portfolio, resolution and accounting (PnL, resolution risk, neg-risk)
 - [x] Phase 4: Strategy framework (interface, lookahead guard, six reference strategies)
-- [ ] Phase 5: Backtester and experiment runner (event-driven, sweeps, synthetic data, stress)
+- [x] Phase 5: Backtester and experiment runner (event-driven, sweeps, synthetic data, stress)
 - [ ] Phase 6: Metrics and reports (metrics, theory vs realized edge, HTML report)
 - [ ] Phase 7: Paper trading mode (live feed, no-order guard test)
 - [ ] Phase 8: Hardening (coverage, profiling, ASSUMPTIONS.md, LIMITATIONS.md)
 
 ## Current work (resume here if a session stopped mid-phase)
 
-Phase 5 plan: `data/synthetic.py` (seeded generator: random-walk books, flash gaps, stale quotes,
-thin depth, halts, injected mispricings, resolutions; label "synthetic"), `engine/backtest.py`
-(event loop: FillEngine + Portfolio + Strategy via MarketView, timers, resolutions, cash and share
-reservation, mock external venue, equity curve, decision log), `strategies/registry.py`,
-`engine/experiment.py` (sweeps, walk-forward, process-pool parallel runs, stress variants:
-latency x3, depth x0.5, fees x2; pass = positive in base and every single stress), and
-`pmsim backtest` CLI. Check `git log` for which of these already landed.
+Phase 6 plan: `analysis/metrics.py` (net PnL, return on capital, annualized return on locked
+capital, Sharpe from the equity curve, max drawdown, hit rate, average edge per trade, fill rate,
+leg-failure rate, slippage vs quoted edge, resolution-loss count), theory vs realized edge per
+strategy, `analysis/report.py` (static HTML per run: equity curve PNG via matplotlib, trade table,
+failure log, synthetic label banner), `pmsim report` CLI. Check `git log` for what landed.
+
+## Synthetic stress results (SYNTHETIC DATA, default SyntheticConfig, 6 h, seed 42)
+
+These are labeled synthetic. They show the machinery works; they say nothing about live profit.
+
+| Strategy | base | latency x3 | depth x0.5 | fees x2 | verdict |
+| - | - | - | - | - | - |
+| complementary | $143.00 | $143.00 | $127.01 | $110.13 | pass (synthetic) |
+| negrisk_sum | $22.31 | $22.31 | $11.15 | $18.11 | pass (synthetic) |
+| near_resolution | -$2,703.70 | -$2,703.70 | -$2,709.37 | -$2,718.62 | fail |
+| market_making | -$128.53 | -$128.53 | -$55.85 | -$128.53 | fail |
+| cross_platform | $857.74 | $857.74 | $717.70 | -$228.89 | fail |
+
+Notes: the arbitrage passes come from mispricings the generator injects on purpose. Latency x3
+changes nothing because synthetic books update every 5 s. Cross-platform PnL is dominated by the
+2% per-market chance that Kalshi resolves differently: with 4 markets one disagreement swings
+every pair on that market to $0 or $2.
 
 ## Final review (after Phase 8)
 
@@ -51,6 +66,10 @@ latency x3, depth x0.5, fees x2; pass = positive in base and every single stress
 
 (newest first; one line per session: UTC time, phase, result)
 
+- 2026-10-27T07:49Z: Phase 5 done, `make check` passes (178 tests). Synthetic generator, event-driven
+  backtester, mock Kalshi venue, registry, sweeps, walk-forward, parallel runs, stress tests,
+  `pmsim backtest`. First synthetic runs exposed a half-updated-pair bug, a stale own-impact view
+  and a market-maker sizing bug; all fixed. Next: Phase 6 (metrics and reports).
 - 2026-10-27T07:35Z: Phase 4 done, `make check` passes (156 tests). Strategy interface, lookahead guard, leg
   manager with unwinds, six reference strategies, Kalshi read-only client and mock feed. Tests
   caught an unwind-proceeds sign bug. Next: Phase 5 (backtester, synthetic data, stress tests).
