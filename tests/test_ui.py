@@ -51,7 +51,8 @@ def cfg(tmp_path: Path) -> Config:
 
 def test_meta_lists_strategies_and_data(cfg: Config) -> None:
     m = api.meta(cfg)
-    assert [s["name"] for s in m["strategies"]] == sorted(BUILDERS)
+    names = [s["name"] for s in m["strategies"]]
+    assert names[: len(BUILDERS)] == sorted(BUILDERS) and "example_momentum" in names
     comp = next(s for s in m["strategies"] if s["name"] == "complementary")
     edge = next(p for p in comp["params"] if p["name"] == "min_edge_usd_per_share")
     assert edge["type"] == "float" and edge["default"] == 0.005 and edge["ge"] == 0
@@ -116,7 +117,7 @@ def test_recorded_requires_data(tmp_path: Path) -> None:
 
 def test_compare_all_strategies(cfg: Config) -> None:
     out = api.compare(cfg, {"hours": 0.5})
-    assert [r["strategy"] for r in out["rows"]] == sorted(BUILDERS)
+    assert [r["strategy"] for r in out["rows"]][: len(BUILDERS)] == sorted(BUILDERS)
     assert all(r["label"] == "synthetic" for r in out["rows"])
 
 
