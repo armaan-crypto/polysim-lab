@@ -1,5 +1,5 @@
 STATUS: IN_PROGRESS
-LOCK: 2026-10-27T07:09Z
+LOCK:
 
 # Progress
 
@@ -9,7 +9,7 @@ Details for each phase are in docs/BUILD_SPEC.md.
 
 - [x] Phase 0: Scaffold (layout, pyproject, Makefile, config, README with Mermaid)
 - [x] Phase 1: Data layer (Gamma and CLOB clients, recorder, catalog, fixtures, CLI)
-- [ ] Phase 2: Order book and matching engine (book, replay, fills, fees, property tests)
+- [x] Phase 2: Order book and matching engine (book, replay, fills, fees, property tests)
 - [ ] Phase 3: Portfolio, resolution and accounting (PnL, resolution risk, neg-risk)
 - [ ] Phase 4: Strategy framework (interface, lookahead guard, six reference strategies)
 - [ ] Phase 5: Backtester and experiment runner (event-driven, sweeps, synthetic data, stress)
@@ -31,11 +31,16 @@ Details for each phase are in docs/BUILD_SPEC.md.
 - `custom_feature_enabled` events (`best_bid_ask`, `new_market`,
   `market_resolved`) are not subscribed or recorded yet.
 - `tick_size_change` frames: parser built from the docs example; none seen live.
+- Fill model queue estimates and latency have not been compared with real fills (no real orders, by design).
+  Resting orders can only fill from trade prints; the WS trade `side` meaning is unverified.
 
 ## Session log
 
 (newest first; one line per session: UTC time, phase, result)
 
+- 2026-10-27T07:35Z: Phase 2 done, `make check` passes (92 tests, hypothesis properties for L2, L3 and
+  the fill engine). Property test found an unknown-id cancel crash, fixed. Live replay of a 20 s
+  recording matches the feed's best bid/ask on 160/160 tokens. Next: Phase 3 (portfolio, resolution).
 - 2026-10-27T07:10Z: Phase 1 done, `make check` passes (45 tests). Network reachable; fixtures
   recorded from live Gamma, CLOB, data-api and WS. Live smoke: fetch 500 markets, record 176
   tokens for 20 s (18.7k snapshot rows, 4.3k deltas, 1 trade). Took over a stale LOCK from a

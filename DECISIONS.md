@@ -18,3 +18,15 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: Recorder sends the documented text `PING` every 10 s and reconnects with capped exponential backoff.
 - 2026-10-27: `recv_ts_ms - exchange_ts_ms` was -5 to +2229 ms live. Clock skew is small but can be negative; latency modeling must not assume ordering.
 - 2026-10-27: Fee docs read on 2026-10-27: taker fee = C * feeRate * p * (1 - p), makers pay none, rate by category (geopolitics 0). Catalog stores feeSchedule.rate per market.
+- 2026-10-27: Integer units: price 1e-4, size 1e-6 shares, cash = price * size (1 USDC = 1e10). Fills and conservation checks are exact.
+- 2026-10-27: Fees rounded to whole micro-USDC per fill. The docs give no rounding rule; USDC has 6 decimals.
+- 2026-10-27: All 500 live fee schedules have exponent 1, so the documented formula C * rate * p * (1 - p) is used as is. Markets with no schedule (null feeType) use `default_taker_rate` 0.05, the conservative "Other / General" rate.
+- 2026-10-27: Gas or settlement cost is charged per fill (`gas_per_trade_usd`). Conservative for orders that fill in pieces.
+- 2026-10-27: L2 replay uncross rule: the newest level wins and crossed opposite levels are dropped. Feed deltas for the two sides can arrive out of order.
+- 2026-10-27: The feed reports best_ask 1 and best_bid 0 for an empty side. Replay of a live 20 s recording matched the feed's best prices on all 160 tokens under that convention.
+- 2026-10-27: Same-timestamp ordering: snapshot, tick change, trade, delta. Trades come before the deltas they cause.
+- 2026-10-27: Requests reach the exchange at submit + latency and run after market events stamped at the same time. Slightly pessimistic.
+- 2026-10-27: Taken depth stays consumed until the recorded level drops by that much or a snapshot arrives. Stops the sim from taking the same liquidity twice.
+- 2026-10-27: Resting orders fill only from trade prints at or through their price, after the queue ahead. Queue ahead starts at the visible level size and only shrinks with trades or when the level shrinks below it. The WS trade `side` is not used: the docs do not say whose side it is.
+- 2026-10-27: Orders that would cross our own resting orders are rejected. No self-trades, and our orders never cross.
+- 2026-10-27: Validation happens at exchange arrival time, so a tick-size change in flight applies.

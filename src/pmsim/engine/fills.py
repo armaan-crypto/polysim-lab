@@ -90,8 +90,12 @@ class FillEngine:
         self._schedule(now + self.latency_ms, "activate", order.id)
         return order
 
-    def cancel(self, order_id: int, now: int) -> None:
+    def cancel(self, order_id: int, now: int) -> bool:
+        """Schedule a cancel. Returns False for an unknown order id."""
+        if order_id not in self.orders:
+            return False
         self._schedule(now + self.latency_ms, "cancel", order_id)
+        return True
 
     def open_orders(self, token: str | None = None) -> list[SimOrder]:
         return [
