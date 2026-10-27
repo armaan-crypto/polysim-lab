@@ -52,6 +52,9 @@ class Market(_Api):
     event_id: str = ""
     event_title: str = ""
     outcome_prices: list[float] = Field(default_factory=list, alias="outcomePrices")
+    best_bid: float | None = Field(default=None, alias="bestBid")
+    best_ask: float | None = Field(default=None, alias="bestAsk")
+    last_trade_price: float | None = Field(default=None, alias="lastTradePrice")
     volume_24h: float = Field(default=0.0, alias="volume24hr")
     volume: float = Field(default=0.0, alias="volumeNum")
     icon: str | None = None

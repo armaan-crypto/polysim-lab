@@ -313,7 +313,7 @@ function enterMarkets() {
   state.markets.data = null;
   render();
   loadMarkets();
-  every(30_000, () => loadMarkets(true));
+  every(5000, () => loadMarkets(true));
 }
 
 async function loadMarkets(quiet = false) {
@@ -324,7 +324,20 @@ async function loadMarkets(quiet = false) {
     m.error = null;
     if (!state.tags.length) { state.tags = m.data.tags; renderCats(); }
   } catch (err) { if (!quiet) m.error = err.message; }
-  if (state.route.view === "markets") render();
+  if (state.route.view !== "markets") return;
+  if (!quiet || !patchCards()) render();
+}
+
+// Swap only the cards whose markup changed, so live prices tick without redrawing the grid.
+function patchCards() {
+  const m = state.markets, cards = document.querySelectorAll(".grid > .card");
+  const fresh = m.data.events.map(eventCard);
+  if (!m.cards || cards.length !== fresh.length || m.data.events.some((ev, i) => cards[i].dataset.slug !== ev.slug)) return false;
+  fresh.forEach((html, i) => { if (html !== m.cards[i]) cards[i].outerHTML = html; });
+  m.cards = fresh;
+  const asOf = $("#as-of");
+  if (asOf) asOf.textContent = fmt.ago(m.data.as_of);
+  return true;
 }
 
 function eventCard(ev) {
@@ -339,7 +352,7 @@ function eventCard(ev) {
         <div class="outcome-row"><span class="label">${esc(m.label)}</span>
           <span class="pct num">${fmt.chance(m.prices[0])}</span>
           <span class="mini">${buy(m, 0, "tag-yes", "Yes")}${buy(m, 1, "tag-no", "No")}</span></div>`).join("")}</div>`;
-  return `<a class="card" href="#event/${encodeURIComponent(ev.slug)}">
+  return `<a class="card" href="#event/${encodeURIComponent(ev.slug)}" data-slug="${esc(ev.slug)}">
     <div class="card-top">${iconFor(ev.icon, ev.title)}<div class="card-title">${esc(ev.title)}</div>${single ? gauge(yesP) : ""}</div>
     ${body}
     <div class="card-foot"><span class="num">${fmt.vol(ev.volume)}</span>
@@ -360,9 +373,9 @@ function viewMarkets() {
   const title = m.query ? `Results for "${esc(m.query)}"` : m.tag ? esc(tagLabel(m.tag)) : "All markets";
   return `<div class="page-head">
       <h1 class="page">${title}</h1>
-      <span class="muted small">${m.data.total} open events, live from Polymarket. Updated ${fmt.ago(m.data.as_of)}.</span>
+      <span class="muted small">${m.data.total} open events, live from Polymarket. Updated <span id="as-of">${fmt.ago(m.data.as_of)}</span>.</span>
     </div>
-    ${events.length ? `<div class="grid">${events.map(eventCard).join("")}</div>`
+    ${events.length ? `<div class="grid">${(m.cards = events.map(eventCard)).join("")}</div>`
       : `<div class="empty"><h2>Nothing matches</h2><p>Try a shorter search or another category.</p></div>`}`;
 }
 
@@ -378,7 +391,8 @@ function enterEvent() {
   };
   render();
   loadEvent();
-  every(3000, () => { loadBook(); });
+  every(1000, loadBook);
+  every(2000, refreshEvent);
   every(15_000, () => refreshPortfolio().then(() => state.route.view === "event" && renderTradeOnly()));
 }
 
@@ -410,6 +424,27 @@ async function loadHistory() {
   if (state.route.view === "event") { drawEventChart(); }
 }
 
+// Merge fresh prices by market id and patch the rows, headline, chart and trade card in place.
+async function refreshEvent() {
+  const e = state.event;
+  if (!e?.data) return;
+  let fresh;
+  try { fresh = await request(`/api/live/event/${encodeURIComponent(e.slug)}`); } catch (err) { return; }
+  if (state.event !== e) return;
+  const byId = new Map(fresh.markets.map((m) => [m.id, m]));
+  const before = JSON.stringify(e.data.markets.map((m) => [m.prices, m.buy]));
+  e.data.markets.forEach((m) => { const f = byId.get(m.id); if (f) Object.assign(m, { prices: f.prices, buy: f.buy, last: f.last, volume: f.volume }); });
+  if (JSON.stringify(e.data.markets.map((m) => [m.prices, m.buy])) === before) return;
+  document.querySelectorAll(".outcome-line").forEach((row, i) => {
+    const html = outcomeLine(e.data.markets[i], i);
+    if (html !== e.rows[i]) { row.outerHTML = html; e.rows[i] = html; }
+  });
+  const hdr = $("#chance-now");
+  if (hdr) hdr.textContent = fmt.chance(selMarket().prices[e.oi]);
+  drawEventChart();
+  if (!e.busy) { if (Number(e.amount) > 0) refreshQuote(); else renderPreviewOnly(); }
+}
+
 async function loadBook() {
   const e = state.event;
   if (!e || !e.data) return;
@@ -417,9 +452,13 @@ async function loadBook() {
     e.book = await request(`/api/live/book?token=${encodeURIComponent(selToken())}`);
     const el = $("#book-body");
     if (el) el.innerHTML = bookLadder(e.book);
-    const hdr = $("#chance-now");
-    if (hdr && e.book.mid !== null) hdr.textContent = fmt.chance(e.book.mid);
   } catch (err) { /* keep showing the last book */ }
+}
+
+// Gamma's last trade is quoted for the first outcome; the second is its complement.
+function lastTrade() {
+  const last = selMarket().last;
+  return last === null || last === undefined ? null : state.event.oi === 0 ? last : 1 - last;
 }
 
 function bookLadder(book) {
@@ -433,7 +472,7 @@ function bookLadder(book) {
   return `<div class="book">
     <div class="book-head"><span>Price</span><span class="r">Shares</span><span class="r">Total</span></div>
     ${asks || `<div class="muted small" style="padding:8px 12px">No asks</div>`}
-    <div class="book-mid"><span>Last ${fmt.cents(book.last)}</span><span>Spread ${book.spread === null ? "-" : fmt.cents(book.spread)}</span></div>
+    <div class="book-mid"><span>Last ${fmt.cents(lastTrade())}</span><span>Spread ${book.spread === null ? "-" : fmt.cents(book.spread)}</span></div>
     ${bids || `<div class="muted small" style="padding:8px 12px">No bids</div>`}</div>`;
 }
 
@@ -445,6 +484,19 @@ function positionsFor(tokens) {
     orders: pf.orders.filter((o) => tokens.includes(o.token)),
   };
 }
+
+function outcomeLine(mk, i) {
+  const e = state.event;
+  return `<div class="outcome-line" data-act="pick-market" data-mi="${i}" aria-selected="${i === e.mi}">
+    <div style="min-width:0"><div class="name">${esc(mk.label)}</div><div class="sub num">${fmt.vol(mk.volume)}</div></div>
+    <span class="pct num">${fmt.chance(mk.prices[0])}</span>
+    <button class="buy-yes ${i === e.mi && e.oi === 0 ? "on" : ""}" data-act="quick-buy" data-mi="${i}" data-oi="0" type="button">Buy Yes ${fmt.cents(mk.buy[0])}</button>
+    <button class="buy-no ${i === e.mi && e.oi === 1 ? "on" : ""}" data-act="quick-buy" data-mi="${i}" data-oi="1" type="button">Buy No ${fmt.cents(mk.buy[1])}</button>
+  </div>`;
+}
+
+// What one share of outcome `i` costs to buy (best ask) or fetches when sold (best bid).
+const sidePrice = (m, i, buy) => (buy ? m.buy[i] : m.buy[1 - i] === null ? null : 1 - m.buy[1 - i]);
 
 function viewEvent() {
   const e = state.event;
@@ -459,12 +511,7 @@ function viewEvent() {
     aria-pressed="${e.interval === iv}" type="button">${iv === "max" ? "ALL" : iv.toUpperCase()}</button>`).join("");
   const rows = multi ? `<div class="outcome-table">
       <div class="outcome-head"><span>Outcome</span><span style="text-align:center">% Chance</span><span></span></div>
-      ${ev.markets.map((mk, i) => `<div class="outcome-line" data-act="pick-market" data-mi="${i}" aria-selected="${i === e.mi}">
-        <div style="min-width:0"><div class="name">${esc(mk.label)}</div><div class="sub num">${fmt.vol(mk.volume)}</div></div>
-        <span class="pct num">${fmt.chance(mk.prices[0])}</span>
-        <button class="buy-yes ${i === e.mi && e.oi === 0 ? "on" : ""}" data-act="quick-buy" data-mi="${i}" data-oi="0" type="button">Buy Yes ${fmt.cents(mk.prices[0])}</button>
-        <button class="buy-no ${i === e.mi && e.oi === 1 ? "on" : ""}" data-act="quick-buy" data-mi="${i}" data-oi="1" type="button">Buy No ${fmt.cents(mk.prices[1])}</button>
-      </div>`).join("")}</div>` : "";
+      ${(e.rows = ev.markets.map(outcomeLine)).join("")}</div>` : "";
   const outcomeName = m.outcomes[e.oi];
   const crumbs = (ev.tags || []).slice(0, 2).map(tagLabel).join(" · ");
   return `<div class="market">
@@ -558,7 +605,7 @@ function tradeHtml() {
         <select data-trade="type" aria-label="Order type">
           <option value="market" ${market ? "selected" : ""}>Market</option><option value="limit" ${market ? "" : "selected"}>Limit</option></select></div>
       <div class="outcome-pick">${m.outcomes.map((o, i) => `<button class="${i === 0 ? "y" : "n"}" data-act="pick-outcome" data-oi="${i}"
-          aria-pressed="${e.oi === i}" type="button">${esc(o)} ${fmt.cents(m.prices[i])}</button>`).join("")}</div>
+          aria-pressed="${e.oi === i}" type="button">${esc(o)} ${fmt.cents(sidePrice(m, i, buy))}</button>`).join("")}</div>
       ${inputs}${preview}
       <button class="primary-btn" data-act="submit-trade" type="button" ${e.busy ? "disabled" : ""}>${e.busy ? "Placing order" : "Trade"}</button>
     </div>
@@ -576,7 +623,8 @@ function drawEventChart() {
   const el = $("#event-chart");
   if (!el || !e?.data) return;
   if (e.history === null) { el.innerHTML = `<div class="skeleton" style="height:100%"></div>`; return; }
-  const pts = e.history;
+  // Polymarket's line ends at the live price, not the last history bucket.
+  const pts = e.history.length ? [...e.history, [Date.now(), selMarket().prices[e.oi]]] : e.history;
   const short = ["1h", "6h", "1d"].includes(e.interval);
   lineChart(el, pts, {
     yMin: Math.max(0, Math.min(...pts.map((p) => p[1])) - 0.03),

@@ -1,8 +1,10 @@
 """Live Polymarket market data through the public, read-only APIs.
 
 Events come from Gamma `/events` (markets nested, as Polymarket shows them),
-books and price history from the CLOB. Responses are cached in memory for a
-few seconds so a busy dashboard does not hammer the APIs.
+price history from the CLOB. Books and top-of-book prices come from the market
+WebSocket when a `LiveStream` is attached, else from the CLOB REST book and
+Gamma's best bid and ask. REST responses are cached in memory for a few seconds
+so a busy dashboard does not hammer the APIs.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from pmsim.config import ApiConfig
 from pmsim.data.clob import ClobClient, Interval
 from pmsim.data.http import HttpClient
 from pmsim.data.models import Market, OrderBookSnapshot, PricePoint
+from pmsim.live.stream import LiveStream, Top
 
 EVENTS_TTL_S = 30.0
 BOOK_TTL_S = 2.0
@@ -95,14 +98,18 @@ def parse_event(raw: dict[str, Any]) -> LiveEvent | None:
 class LiveData:
     """Cached, read-only access to live Polymarket data."""
 
-    def __init__(self, api: ApiConfig, http: HttpClient | None = None) -> None:
+    def __init__(
+        self, api: ApiConfig, http: HttpClient | None = None, stream: LiveStream | None = None
+    ) -> None:
         self.api = api
         self.http = http or HttpClient(api)
         self.clob = ClobClient(self.http, api.clob_url)
+        self.stream = stream
         self._events = _Cache(EVENTS_TTL_S)
         self._books = _Cache(BOOK_TTL_S)
         self._history = _Cache(HISTORY_TTL_S)
         self._markets = _Cache(MARKET_TTL_S)
+        self._slugs = _Cache(EVENTS_TTL_S)
 
     def events(self, pages: int = 2) -> list[LiveEvent]:
         """Open events by 24 h volume, biggest first."""
@@ -112,11 +119,27 @@ class LiveData:
         for ev in self.events():
             if ev.slug == slug:
                 return ev
+        return self._slugs.get(slug, lambda: self._load_event(slug))  # type: ignore[no-any-return]
+
+    def _load_event(self, slug: str) -> LiveEvent | None:
         raw = self.http.get_json(f"{self.api.gamma_url}/events", {"slug": slug})
         return parse_event(raw[0]) if raw else None
 
     def book(self, token: str) -> OrderBookSnapshot:
+        if self.stream is not None:
+            self.stream.watch([token])
+            if (live := self.stream.snapshot(token)) is not None:
+                return live
         return self._books.get(token, lambda: self.clob.book(token))  # type: ignore[no-any-return]
+
+    def live_top(self, market: Market, watch: bool = True) -> Top | None:
+        """Streamed best bid and ask of the market's first (Yes) token, or None if not live."""
+        if self.stream is None:
+            return None
+        token = market.token_ids[0]
+        if watch:
+            self.stream.watch([token])
+        return self.stream.top(token)
 
     def history(self, token: str, interval: Interval) -> list[PricePoint]:
         fidelity = {"1h": 1, "6h": 5, "1d": 10, "1w": 60, "1m": 180, "max": 720}[interval]

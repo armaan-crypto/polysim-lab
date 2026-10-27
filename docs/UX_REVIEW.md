@@ -94,6 +94,7 @@ real bot code.
   happens on Fed Decision "25 bps increase / No": mid 94.5¢, "Last 5¢". The
   market-level `last_trade_price` is shown on both tokens. Screenshot:
   `ux_review/02-event-binary.png`.
+- **Status:** Fixed 2026-10-27. Prices now stream from Polymarket's market WebSocket.
 
 ### 7. "Max" / "50%" sell leaves unsellable dust (medium)
 
@@ -160,6 +161,7 @@ real bot code.
   Yes 94.5¢" rows and the multi-outcome chance column keep the Gamma prices from
   page load. The dark-mode screenshot shows "95% chance" above a "No change 94%"
   row. Screenshot: `ux_review/07-dark-event.png`.
+- **Status:** Fixed 2026-10-27. Prices now stream from Polymarket's market WebSocket.
 
 ### 14. Lab equity chart runs past the simulated window (low)
 
@@ -183,6 +185,7 @@ real bot code.
 - **Expected:** "Buy Yes 18¢" (the ask), as on Polymarket.
 - **Actual:** "Yes 17.5¢" (Gamma `outcomePrices`), while the fill and toast say
   18¢. Dana reads that as slippage on a $25 order.
+- **Status:** Fixed 2026-10-27. Prices now stream from Polymarket's market WebSocket.
 
 ### 17. Average price changes between the toast and the position (medium)
 

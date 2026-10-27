@@ -67,6 +67,22 @@ forward folds are small. Treat any single number as anecdote.
 Paper trading uses the same fill model on live data, so it shares every
 limit above. A restart drops open simulated orders and multi-leg state.
 
+## Live data freshness (dashboard)
+
+- Prices, Buy/Sell prices and order books stream from Polymarket's public market
+  WebSocket, the feed polymarket.com uses. The page shows them within about
+  1 to 5 seconds (book every 1 s, market page every 2 s, market grid every 5 s).
+- The displayed chance follows Polymarket's rule: the midpoint, or the last trade
+  when the spread is wider than 10¢. The last trade comes from Gamma, which
+  refreshes about once a minute, so the wide-spread case can lag.
+- Only outcomes on screen are streamed: the first two per market card and up to
+  60 per market page. Others show Gamma's snapshot, about a minute old.
+- Event lists, titles, volumes and new markets come from Gamma, cached 30 s.
+- If the WebSocket drops or goes quiet for 30 s, prices fall back to Gamma and
+  books to the CLOB REST endpoint until it reconnects.
+- The chart history comes from the CLOB `prices-history` buckets with the live
+  price appended as the last point.
+
 ## Paper trading desk (dashboard)
 
 - Market orders walk the live book once, at the moment you click. A real

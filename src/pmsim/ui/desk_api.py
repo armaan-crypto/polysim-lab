@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+import websockets
 from pydantic import ValidationError
 
 from pmsim.config import Config
@@ -19,12 +20,15 @@ from pmsim.engine.backtest import Backtest, BacktestConfig
 from pmsim.live.account import Instrument, PaperAccount, Side, TradeError
 from pmsim.live.bots import BotManager, BotRule, RuleBot, RuleBotConfig, history_data
 from pmsim.live.data import LiveData, LiveEvent
+from pmsim.live.stream import LiveStream, displayed_price
 from pmsim.live.worker import Desk
 from pmsim.ui.api import ApiError, result_payload, summary
 
 INTERVALS = ("1h", "6h", "1d", "1w", "1m", "max")
 HIDDEN_TAGS = frozenset({"hide-from-new", "recurring", "all", "featured", "new", "trending"})
 BOOK_DEPTH = 15
+CARD_MARKETS = 2  # outcomes shown on a market card; only these are streamed for the grid
+PAGE_MARKETS = 60  # most outcomes streamed for one market page
 
 
 @dataclass
@@ -37,7 +41,7 @@ class DeskContext:
 
 
 def make_context(cfg: Config, data: LiveData | None = None) -> DeskContext:
-    live = data or LiveData(cfg.api)
+    live = data or LiveData(cfg.api, stream=LiveStream(cfg.api.ws_url, websockets.connect))
     account = PaperAccount(cfg.data_dir / "desk")
     bots = BotManager(cfg.data_dir / "desk", account, live)
     return DeskContext(cfg, live, account, bots, Desk(account, live, bots))
@@ -46,14 +50,26 @@ def make_context(cfg: Config, data: LiveData | None = None) -> DeskContext:
 # ---- market data ------------------------------------------------------------------
 
 
-def _market_json(ev: LiveEvent, m: Market) -> dict[str, Any]:
+def _market_json(data: LiveData, ev: LiveEvent, m: Market, watch: bool) -> dict[str, Any]:
+    """`prices` is what polymarket.com shows per outcome; `buy` is the cost to buy each one.
+
+    Both come from the streamed book when it is live, else from Gamma's last snapshot.
+    """
+    yes = m.outcome_prices[0] if m.outcome_prices else None
+    buy: list[float | None] = [m.best_ask, None if m.best_bid is None else 1 - m.best_bid]
+    if (top := data.live_top(m, watch)) is not None:
+        bid, ask = top
+        yes = displayed_price(bid, ask, m.last_trade_price)
+        buy = [ask, None if bid is None else 1 - bid]
     return {
         "id": m.id,
         "slug": m.slug,
         "label": m.group_item_title or m.question,
         "question": m.question,
         "outcomes": m.outcomes,
-        "prices": m.outcome_prices,
+        "prices": m.outcome_prices if yes is None else [yes, 1 - yes],
+        "buy": buy,
+        "last": m.last_trade_price,
         "tokens": m.token_ids,
         "volume": m.volume,
         "tick": m.tick_size,
@@ -64,7 +80,7 @@ def _market_json(ev: LiveEvent, m: Market) -> dict[str, Any]:
     }
 
 
-def _event_json(ev: LiveEvent, full: bool = False) -> dict[str, Any]:
+def _event_json(data: LiveData, ev: LiveEvent, full: bool = False) -> dict[str, Any]:
     markets = sorted(ev.markets, key=lambda m: -(m.outcome_prices[0] if m.outcome_prices else 0))
     out = {
         "id": ev.id,
@@ -76,7 +92,10 @@ def _event_json(ev: LiveEvent, full: bool = False) -> dict[str, Any]:
         "volume_24h": ev.volume_24h,
         "neg_risk": ev.neg_risk,
         "tags": list(ev.tags[:4]),
-        "markets": [_market_json(ev, m) for m in markets],
+        "markets": [
+            _market_json(data, ev, m, i < (PAGE_MARKETS if full else CARD_MARKETS))
+            for i, m in enumerate(markets)
+        ],
     }
     if full:
         out["description"] = ev.description
@@ -115,7 +134,7 @@ def live_events(
                 counts[t] = counts.get(t, 0) + 1
     top_tags = sorted(counts, key=lambda t: -counts[t])[:14]
     return {
-        "events": [_event_json(e) for e in events[: min(limit, 200)]],
+        "events": [_event_json(ctx.data, e) for e in events[: min(limit, 200)]],
         "total": len(events),
         "tags": top_tags,
         "as_of": int(time.time() * 1000),
@@ -126,7 +145,7 @@ def live_event(ctx: DeskContext, slug: str) -> dict[str, Any]:
     ev = _live(ctx.data.event, slug)
     if ev is None:
         raise ApiError(f"no open market {slug!r}")
-    return _event_json(ev, full=True)
+    return _event_json(ctx.data, ev, full=True)
 
 
 def live_book(ctx: DeskContext, token: str) -> dict[str, Any]:
