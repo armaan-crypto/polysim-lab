@@ -1,0 +1,9 @@
+# Single configuration file for pmsim. Loaded by pmsim.config.load_config.
+data_dir: data
+seed: 42
+latency_ms: 150
+fees:
+  taker_bps: 0
+  maker_bps: 0
+  gas_per_trade_usd: 0.0
+  checked_on: null   # set to the date the fee schedule was read from the docs

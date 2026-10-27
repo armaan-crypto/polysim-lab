@@ -1,5 +1,5 @@
 STATUS: IN_PROGRESS
-LOCK: 2026-10-27T06:31:39Z
+LOCK: none
 
 # Progress
 
@@ -7,7 +7,7 @@ Details for each phase are in docs/BUILD_SPEC.md.
 
 ## Phases
 
-- [ ] Phase 0: Scaffold (layout, pyproject, Makefile, config, README with Mermaid)
+- [x] Phase 0: Scaffold (layout, pyproject, Makefile, config, README with Mermaid)
 - [ ] Phase 1: Data layer (Gamma and CLOB clients, recorder, catalog, fixtures, CLI)
 - [ ] Phase 2: Order book and matching engine (book, replay, fills, fees, property tests)
 - [ ] Phase 3: Portfolio, resolution and accounting (PnL, resolution risk, neg-risk)
@@ -31,3 +31,5 @@ Details for each phase are in docs/BUILD_SPEC.md.
 ## Session log
 
 (newest first; one line per session: UTC time, phase, result)
+
+- 2026-10-27T06:35Z: Phase 0 done, `make check` passes (7 tests). Next: Phase 1 (data layer). Network access to Polymarket not yet tested.
