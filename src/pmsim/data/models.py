@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Side = Literal["BUY", "SELL"]
 
@@ -49,7 +49,12 @@ class Market(_Api):
     neg_risk_market_id: str = Field(default="", alias="negRiskMarketID")
     neg_risk_other: bool = Field(default=False, alias="negRiskOther")
     group_item_title: str = Field(default="", alias="groupItemTitle")
-    event_id: str = Field(default="", alias="events")
+    event_id: str = ""
+    event_title: str = ""
+    outcome_prices: list[float] = Field(default_factory=list, alias="outcomePrices")
+    volume_24h: float = Field(default=0.0, alias="volume24hr")
+    volume: float = Field(default=0.0, alias="volumeNum")
+    icon: str | None = None
     tick_size: float = Field(alias="orderPriceMinTickSize")
     min_order_size: float = Field(alias="orderMinSize")
     fees_enabled: bool = Field(default=False, alias="feesEnabled")
@@ -59,15 +64,18 @@ class Market(_Api):
     closed: bool = False
     accepting_orders: bool = Field(default=False, alias="acceptingOrders")
 
-    _decode_lists = field_validator("outcomes", "token_ids", mode="before")(_json_list)
+    _decode_lists = field_validator("outcomes", "token_ids", "outcome_prices", mode="before")(
+        _json_list
+    )
 
-    @field_validator("event_id", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def _first_event_id(cls, value: object) -> object:
-        """Gamma nests the parent event as `events: [{"id": ...}]`."""
-        if isinstance(value, list):
-            return str(value[0]["id"]) if value else ""
-        return value
+    def _parent_event(cls, data: object) -> object:
+        """Gamma nests the parent event as `events: [{"id": ..., "title": ...}]`."""
+        if isinstance(data, dict) and data.get("events"):
+            event = data["events"][0]
+            data = {**data, "event_id": str(event["id"]), "event_title": event.get("title", "")}
+        return data
 
 
 class BookLevel(_Api):

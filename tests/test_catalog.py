@@ -35,6 +35,16 @@ def test_event_and_neg_risk_fields(markets: list[Market]) -> None:
     assert nr["neg_risk_market_id"][0].startswith("0x")
     assert nr["group_item_title"][0] == "No change"
     assert df.filter(~pl.col("neg_risk"))["neg_risk_market_id"].to_list() == ["", ""]
+    assert nr["event_title"][0] == "Fed Decision in October?"
+
+
+def test_prices_and_volume(markets: list[Market]) -> None:
+    df = build_catalog(markets)
+    first = df.filter(pl.col("market_id") == markets[0].id)
+    assert first["price"].sum() == pytest.approx(1.0)
+    assert first["volume_24h"][0] > 0 and first["icon"][0].startswith("https://")
+    odd = markets[0].model_copy(update={"outcome_prices": [0.5]})
+    assert build_catalog([odd])["price"].null_count() == 2
 
 
 def test_status_and_fee_fields(markets: list[Market]) -> None:

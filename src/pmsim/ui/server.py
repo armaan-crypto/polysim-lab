@@ -53,9 +53,11 @@ def make_handler(cfg: Config) -> type[BaseHTTPRequestHandler]:
                 name = path.removeprefix("/api/paper/")
                 tail = int(query.get("tail", "100"))
                 self._json(lambda: api.paper_session(cfg, name, min(max(tail, 1), 1000)))
-            elif path == "/api/catalog":
-                limit = int(query.get("limit", "100"))
-                self._json(lambda: api.catalog(cfg, query.get("q", ""), limit))
+            elif path == "/api/events":
+                limit = int(query.get("limit", "60"))
+                self._json(lambda: api.events(cfg, query.get("q", ""), limit))
+            elif path == "/api/book":
+                self._json(lambda: api.book(cfg, query.get("token", "")))
             else:
                 self._static(path)
 

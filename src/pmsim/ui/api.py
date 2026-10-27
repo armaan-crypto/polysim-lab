@@ -323,34 +323,151 @@ def _shorten_tokens(text: str, labels: Mapping[str, str]) -> str:
     return text
 
 
-# ---- catalog ---------------------------------------------------------------------------
+# ---- markets (Polymarket-style events) -----------------------------------------------
 
 
-def catalog(cfg: Config, query: str = "", limit: int = 100) -> dict[str, Any]:
+def _event_cards(df: pl.DataFrame, recorded: set[str]) -> list[dict[str, Any]]:
+    cards = []
+    for (event_id,), grp in df.group_by(["event_key"], maintain_order=True):
+        yes = grp.filter(pl.col("outcome_index") == 0)
+        no = {
+            r["market_id"]: r
+            for r in grp.filter(pl.col("outcome_index") == 1).iter_rows(named=True)
+        }
+        first = yes.row(0, named=True)
+        markets = []
+        for r in yes.sort("price", descending=True, nulls_last=True).iter_rows(named=True):
+            other = no.get(r["market_id"], {})
+            markets.append(
+                {
+                    "market_id": r["market_id"],
+                    "label": r["group_item_title"] or r["question"],
+                    "question": r["question"],
+                    "outcomes": [r["outcome"], other.get("outcome", "No")],
+                    "yes_price": r["price"],
+                    "no_price": other.get("price"),
+                    "yes_token": r["token_id"],
+                    "no_token": other.get("token_id"),
+                    "recorded": r["token_id"] in recorded or other.get("token_id") in recorded,
+                    "status": r["status"],
+                }
+            )
+        cards.append(
+            {
+                "event_id": str(event_id),
+                "title": first["event_title"] or first["question"],
+                "icon": first["icon"],
+                "volume_24h": float(yes["volume_24h"].sum()),
+                "volume": float(yes["volume"].sum()),
+                "end": first["end_date"].isoformat() if first["end_date"] else None,
+                "tags": [t for t in (first["tags"] or []) if t][:3],
+                "neg_risk": bool(first["neg_risk"]),
+                "fee_rate": first["fee_rate"],
+                "markets": markets,
+            }
+        )
+    return cards
+
+
+def events(cfg: Config, query: str = "", limit: int = 60) -> dict[str, Any]:
+    """Catalog grouped by event, biggest 24 h volume first. Prices are Gamma's at fetch time."""
     path = cfg.data_dir / "catalog.parquet"
     if not path.exists():
-        return {"markets": [], "total": 0}
-    df = pl.read_parquet(path).filter(pl.col("outcome_index") == 0)
+        return {"events": [], "total": 0, "fetched": None}
+    df = pl.read_parquet(path).with_columns(
+        pl.when(pl.col("event_id") != "")
+        .then(pl.col("event_id"))
+        .otherwise(pl.col("market_id"))
+        .alias("event_key")
+    )
     if query:
         q = query.lower()
         df = df.filter(
-            pl.col("slug").str.contains(q, literal=True)
-            | pl.col("question").str.to_lowercase().str.contains(q, literal=True)
+            pl.col("question").str.to_lowercase().str.contains(q, literal=True)
+            | pl.col("event_title").str.to_lowercase().str.contains(q, literal=True)
             | pl.col("tags").list.contains(q)
         )
-    total = df.height
-    rows = [
-        {
-            "question": r["question"],
-            "slug": r["slug"],
-            "status": r["status"],
-            "neg_risk": r["neg_risk"],
-            "tick": r["tick_size"],
-            "fee_rate": r["fee_rate"],
-            "fee_type": r["fee_type"],
-            "end": r["end_date"].isoformat() if r["end_date"] else None,
-            "tags": list(r["tags"] or [])[:4],
+    order = (
+        df.group_by("event_key")
+        .agg(pl.col("volume_24h").sum().alias("v"))
+        .sort("v", descending=True)
+    )
+    total = order.height
+    keys = order["event_key"].head(min(limit, 200)).to_list()
+    picked = (
+        df.filter(pl.col("event_key").is_in(keys))
+        .join(order.select("event_key", "v"), on="event_key")
+        .sort("v", descending=True, maintain_order=True)
+    )
+    recorded = set(_recorded_books(str(cfg.data_dir)))
+    return {
+        "events": _event_cards(picked, recorded),
+        "total": total,
+        "fetched": int(path.stat().st_mtime * 1000),
+    }
+
+
+def _raw_signature(data_dir: Path) -> tuple[int, int]:
+    files = list((data_dir / "raw").glob("*/*.parquet"))
+    return len(files), max((int(f.stat().st_mtime) for f in files), default=0)
+
+
+@lru_cache(maxsize=2)
+def _books_at(data_dir: str, signature: tuple[int, int]) -> dict[str, dict[str, Any]]:
+    from pmsim.book.replay import TradePrint, load_events, rebuild_books
+
+    raw = Path(data_dir) / "raw"
+    if not raw.exists():
+        return {}
+    events = load_events(raw)
+    books = rebuild_books(events)
+    last: dict[str, tuple[int, int]] = {}
+    times: dict[str, int] = {}
+    for ev in events:
+        times[ev.token] = ev.ts
+        if isinstance(ev, TradePrint):
+            last[ev.token] = (ev.price, ev.size)
+    return {
+        token: {
+            "bids": book.levels("BUY"),
+            "asks": book.levels("SELL"),
+            "ts": times.get(token, 0),
+            "last": last.get(token),
         }
-        for r in df.head(min(limit, 500)).iter_rows(named=True)
-    ]
-    return {"markets": rows, "total": total}
+        for token, book in books.items()
+    }
+
+
+def _recorded_books(data_dir: str) -> dict[str, dict[str, Any]]:
+    return _books_at(data_dir, _raw_signature(Path(data_dir)))
+
+
+def book(cfg: Config, token: str, depth: int = 12) -> dict[str, Any]:
+    """The recorded order book for one token, as of the end of the recording."""
+    books = _recorded_books(str(cfg.data_dir))
+    if token not in books:
+        raise ApiError("no recorded book for this market; record it with `pmsim record`")
+    b = books[token]
+
+    def levels(rows: list[tuple[int, int]]) -> list[dict[str, float]]:
+        out, total = [], 0.0
+        for price, size in rows[:depth]:
+            shares = size / SIZE_SCALE
+            total += shares * price / PRICE_SCALE
+            out.append({"price": price / PRICE_SCALE, "shares": shares, "total": total})
+        return out
+
+    bids, asks = levels(b["bids"]), levels(b["asks"])
+    spread = asks[0]["price"] - bids[0]["price"] if bids and asks else None
+    last = b["last"]
+    return {
+        "token": token,
+        "label": _label(token, token_labels(str(cfg.data_dir))),
+        "bids": bids,
+        "asks": asks,
+        "spread": spread,
+        "last": None
+        if last is None
+        else {"price": last[0] / PRICE_SCALE, "shares": last[1] / SIZE_SCALE},
+        "as_of": b["ts"],
+    }

@@ -20,6 +20,11 @@ SCHEMA: dict[str, pl.DataType | type[pl.DataType]] = {
     "outcome": pl.Utf8,
     "outcome_index": pl.Int32,
     "event_id": pl.Utf8,
+    "event_title": pl.Utf8,
+    "price": pl.Float64,
+    "volume_24h": pl.Float64,
+    "volume": pl.Float64,
+    "icon": pl.Utf8,
     "neg_risk": pl.Boolean,
     "neg_risk_market_id": pl.Utf8,
     "neg_risk_other": pl.Boolean,
@@ -49,13 +54,17 @@ def market_status(m: Market) -> str:
 
 
 def catalog_rows(m: Market) -> list[dict[str, object]]:
-    """Expand one market into a row per outcome token."""
+    """Expand one market into a row per outcome token. `price` is Gamma's quote at fetch time."""
     shared = {
         "market_id": m.id,
         "condition_id": m.condition_id,
         "slug": m.slug,
         "question": m.question,
         "event_id": m.event_id,
+        "event_title": m.event_title,
+        "volume_24h": m.volume_24h,
+        "volume": m.volume,
+        "icon": m.icon,
         "neg_risk": m.neg_risk,
         "neg_risk_market_id": m.neg_risk_market_id,
         "neg_risk_other": m.neg_risk_other,
@@ -73,8 +82,15 @@ def catalog_rows(m: Market) -> list[dict[str, object]]:
         "resolution_source": m.resolution_source,
         "rules": m.rules,
     }
+    prices = m.outcome_prices if len(m.outcome_prices) == len(m.token_ids) else []
     return [
-        {**shared, "token_id": tok, "outcome": out, "outcome_index": i}
+        {
+            **shared,
+            "token_id": tok,
+            "outcome": out,
+            "outcome_index": i,
+            "price": prices[i] if prices else None,
+        }
         for i, (tok, out) in enumerate(zip(m.token_ids, m.outcomes, strict=True))
     ]
 
