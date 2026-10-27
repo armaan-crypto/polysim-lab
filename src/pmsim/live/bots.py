@@ -340,7 +340,7 @@ class BotManager:
             self._log(
                 spec.id,
                 action.side.lower(),
-                f"{verb} {row['shares']:,.2f} @ {row['avg_price'] * 100:.1f}c"
+                f"{verb} {row['shares']:,.2f} @ {row['avg_price'] * 100:.1f}¢"
                 f" because {action.reason}",
             )
 
@@ -367,10 +367,10 @@ class BotManager:
 
 
 def describe_rule(rule: BotRule) -> str:
-    parts = [f"Buy ${rule.order_usd:g} when the price is {rule.entry} {rule.entry_price * 100:g}c"]
+    parts = [f"Buy ${rule.order_usd:g} when the price is {rule.entry} {rule.entry_price * 100:g}¢"]
     if rule.take_profit is not None:
-        parts.append(f"sell at {rule.take_profit * 100:g}c")
+        parts.append(f"sell at {rule.take_profit * 100:g}¢")
     if rule.stop_loss is not None:
-        parts.append(f"stop out at {rule.stop_loss * 100:g}c")
+        parts.append(f"stop out at {rule.stop_loss * 100:g}¢")
     parts.append(f"hold at most ${rule.max_position_usd:g}")
     return ", ".join(parts) + "."

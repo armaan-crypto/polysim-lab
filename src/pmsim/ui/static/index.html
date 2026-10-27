@@ -15,32 +15,34 @@
 <body>
   <header class="topbar">
     <div class="topbar-row">
-      <div class="brand">
+      <a class="brand" href="#markets" aria-label="polysim home">
         <span class="brand-name">polysim</span>
-        <span class="brand-tag">Simulator</span>
-      </div>
+        <span class="brand-tag">Paper money</span>
+      </a>
       <label class="search">
-        <input id="search" type="search" placeholder="Search markets" aria-label="Search markets" autocomplete="off">
+        <input id="search" type="search" placeholder="Search Polymarket" aria-label="Search markets" autocomplete="off">
       </label>
       <div class="top-actions">
-        <span class="data-status" id="data-status"></span>
-        <button class="ghost-btn" id="theme-btn" type="button" aria-label="Switch theme">Theme: auto</button>
+        <a class="balance" href="#portfolio" id="balance-portfolio"><span>Portfolio</span><b class="num">-</b></a>
+        <a class="balance" href="#portfolio" id="balance-cash"><span>Cash</span><b class="num">-</b></a>
+        <button class="ghost-btn" id="theme-btn" type="button" aria-label="Switch theme">Auto</button>
       </div>
     </div>
-    <nav class="tabs" role="tablist" aria-label="Sections">
-      <button class="tab" role="tab" data-view="markets">Markets</button>
-      <button class="tab" role="tab" data-view="backtest">Backtest</button>
-      <button class="tab" role="tab" data-view="compare">Compare</button>
-      <button class="tab" role="tab" data-view="paper">Paper trading</button>
+    <nav class="tabs" aria-label="Sections">
+      <a class="tab" data-view="markets" href="#markets">Markets</a>
+      <a class="tab" data-view="portfolio" href="#portfolio">Portfolio</a>
+      <a class="tab" data-view="bots" href="#bots">Bots</a>
+      <a class="tab" data-view="lab" href="#lab">Strategy lab</a>
     </nav>
   </header>
 
   <main id="app" aria-live="polite"></main>
-  <div id="drawer-root"></div>
+  <div id="modal-root"></div>
+  <div id="toasts" aria-live="assertive"></div>
 
   <footer>
-    polysim is a local research simulator. It is not affiliated with Polymarket and never places orders.
-    Prices on market cards are a snapshot from the last <span class="num">pmsim fetch</span>.
+    polysim is a local simulator with live data from Polymarket's public API. Trades use paper money and never reach
+    Polymarket. Not affiliated with Polymarket.
   </footer>
 
   <script src="app.js"></script>

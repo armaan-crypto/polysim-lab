@@ -121,42 +121,6 @@ def test_compare_all_strategies(cfg: Config) -> None:
     assert all(r["label"] == "synthetic" for r in out["rows"])
 
 
-def test_events_group_markets(cfg: Config) -> None:
-    out = api.events(cfg)
-    assert out["total"] == 2
-    fed = next(e for e in out["events"] if e["title"] == "Fed Decision in October?")
-    assert fed["neg_risk"] and len(fed["markets"]) == 1
-    xi = next(e for e in out["events"] if e["title"].startswith("Xi Jinping"))
-    assert xi["markets"][0]["recorded"] and xi["markets"][0]["yes_price"] is not None
-    assert api.events(cfg, "fed")["total"] == 1
-    assert api.events(cfg, "zzz")["events"] == []
-    assert api.events(Config(data_dir=cfg.data_dir / "none"))["events"] == []
-
-
-def test_book_from_recording(cfg: Config) -> None:
-    token = api.events(cfg, "xi")["events"][0]["markets"][0]["yes_token"]
-    b = api.book(cfg, token)
-    assert b["bids"] and b["asks"] and b["bids"][0]["price"] < b["asks"][0]["price"]
-    assert b["bids"][1]["total"] > b["bids"][0]["total"]
-    assert b["spread"] == pytest.approx(b["asks"][0]["price"] - b["bids"][0]["price"])
-    with pytest.raises(api.ApiError, match="no recorded book"):
-        api.book(cfg, "missing")
-
-
-def test_paper_sessions(cfg: Config) -> None:
-    sessions = api.paper_sessions(cfg)["sessions"]
-    assert [s["name"] for s in sessions] == ["demo"] and sessions[0]["open_positions"] == 1
-    d = api.paper_session(cfg, "demo")
-    assert d["positions"][0]["shares"] == 10 and d["positions"][0]["avg_price"] == 0.5
-    assert "Xi Jinping" not in d["decisions"][0]["detail"]  # labels use slugs
-    assert "xi-jinping" in d["decisions"][0]["detail"]
-    with pytest.raises(api.ApiError):
-        api.paper_session(cfg, "../etc")
-    with pytest.raises(api.ApiError):
-        api.paper_session(cfg, "missing")
-    assert api.paper_sessions(Config(data_dir=cfg.data_dir / "none")) == {"sessions": []}
-
-
 # ---- http server ---------------------------------------------------------------------------
 
 
@@ -184,10 +148,8 @@ def test_static_files_and_traversal(client: httpx.Client) -> None:
 
 def test_api_routes(client: httpx.Client) -> None:
     assert client.get("/api/meta").json()["recorded"]["available"]
-    assert client.get("/api/events?q=fed").json()["total"] == 1
-    assert client.get("/api/paper").json()["sessions"][0]["name"] == "demo"
-    assert client.get("/api/paper/demo?tail=5").json()["name"] == "demo"
-    assert client.get("/api/book?token=missing").status_code == 400
+    assert client.get("/api/portfolio").json()["cash"] == 10_000
+    assert client.get("/api/bots").json()["bots"] == []
     run = client.post("/api/run", json={"strategy": "logical", "hours": 0.5})
     assert run.status_code == 200 and run.json()["strategy"] == "logical"
     assert client.post("/api/compare", json={"hours": 0.25}).status_code == 200

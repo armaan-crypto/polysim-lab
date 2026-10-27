@@ -50,10 +50,6 @@ def get_routes(cfg: Config, ctx: DeskContext) -> dict[str, Callable[[str, Query]
     """Prefix -> handler(rest of path, query)."""
     return {
         "/api/meta": lambda _, q: api.meta(cfg),
-        "/api/paper/": lambda rest, q: api.paper_session(cfg, rest, _int(q, "tail", 100, 1, 1000)),
-        "/api/paper": lambda _, q: api.paper_sessions(cfg),
-        "/api/events": lambda _, q: api.events(cfg, q.get("q", ""), _int(q, "limit", 60, 1, 200)),
-        "/api/book": lambda _, q: api.book(cfg, q.get("token", "")),
         "/api/live/events": lambda _, q: desk_api.live_events(
             ctx, q.get("q", ""), q.get("tag", ""), _int(q, "limit", 60, 1, 200)
         ),

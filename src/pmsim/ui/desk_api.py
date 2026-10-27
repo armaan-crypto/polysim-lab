@@ -23,6 +23,7 @@ from pmsim.live.worker import Desk
 from pmsim.ui.api import ApiError, result_payload, summary
 
 INTERVALS = ("1h", "6h", "1d", "1w", "1m", "max")
+HIDDEN_TAGS = frozenset({"hide-from-new", "recurring", "all", "featured", "new", "trending"})
 BOOK_DEPTH = 15
 
 
@@ -110,7 +111,8 @@ def live_events(
     counts: dict[str, int] = {}
     for e in _live(ctx.data.events):
         for t in e.tags[:4]:
-            counts[t] = counts.get(t, 0) + 1
+            if t not in HIDDEN_TAGS:
+                counts[t] = counts.get(t, 0) + 1
     top_tags = sorted(counts, key=lambda t: -counts[t])[:14]
     return {
         "events": [_event_json(e) for e in events[: min(limit, 200)]],
@@ -294,7 +296,7 @@ def bots(ctx: DeskContext) -> dict[str, Any]:
 def create_bot(ctx: DeskContext, body: Mapping[str, Any]) -> dict[str, Any]:
     inst = instrument(ctx, str(body.get("event_slug", "")), str(body.get("token", "")))
     rule = _rule(body.get("rule", {}))
-    name = str(body.get("name") or f"{inst.outcome} on {inst.label}")[:60]
+    name = str(body.get("name") or f"{inst.label}: {inst.outcome}")[:60]
     try:
         spec = ctx.bots.create(
             {
