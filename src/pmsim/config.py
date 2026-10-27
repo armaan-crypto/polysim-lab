@@ -20,6 +20,22 @@ class FeeConfig(BaseModel):
     checked_on: date | None = None
 
 
+class ApiConfig(BaseModel):
+    """Endpoints and client behavior for the public, read-only APIs."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    gamma_url: str = "https://gamma-api.polymarket.com"
+    clob_url: str = "https://clob.polymarket.com"
+    data_url: str = "https://data-api.polymarket.com"
+    ws_url: str = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+    requests_per_second: float = Field(default=5.0, gt=0)
+    max_retries: int = Field(default=4, ge=0)
+    backoff_s: float = Field(default=0.5, ge=0)
+    timeout_s: float = Field(default=15.0, gt=0)
+    cache_ttl_s: float = Field(default=300.0, ge=0)
+
+
 class Config(BaseModel):
     """Top-level simulator configuration."""
 
@@ -29,6 +45,7 @@ class Config(BaseModel):
     seed: int = 42
     latency_ms: int = Field(default=150, ge=0)
     fees: FeeConfig = FeeConfig()
+    api: ApiConfig = ApiConfig()
 
 
 def load_config(path: Path | str) -> Config:

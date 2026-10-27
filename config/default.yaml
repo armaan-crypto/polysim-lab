@@ -7,3 +7,13 @@ fees:
   maker_bps: 0
   gas_per_trade_usd: 0.0
   checked_on: null   # set to the date the fee schedule was read from the docs
+api:
+  gamma_url: https://gamma-api.polymarket.com
+  clob_url: https://clob.polymarket.com
+  data_url: https://data-api.polymarket.com
+  ws_url: wss://ws-subscriptions-clob.polymarket.com/ws/market
+  requests_per_second: 5.0   # well below documented limits
+  max_retries: 4
+  backoff_s: 0.5             # doubles per retry
+  timeout_s: 15.0
+  cache_ttl_s: 300.0         # 0 disables the local GET cache

@@ -9,3 +9,5 @@ data/*.duckdb
 reports/
 .env
 *.key
+data/cache/
+data/catalog.parquet
