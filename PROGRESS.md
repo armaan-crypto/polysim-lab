@@ -1,5 +1,5 @@
-STATUS: IN_PROGRESS
-LOCK: 2026-10-27T08:07Z
+STATUS: DONE
+LOCK:
 
 # Progress
 
@@ -15,15 +15,20 @@ Details for each phase are in docs/BUILD_SPEC.md.
 - [x] Phase 5: Backtester and experiment runner (event-driven, sweeps, synthetic data, stress)
 - [x] Phase 6: Metrics and reports (metrics, theory vs realized edge, HTML report)
 - [x] Phase 7: Paper trading mode (live feed, no-order guard test)
-- [ ] Phase 8: Hardening (coverage, profiling, ASSUMPTIONS.md, LIMITATIONS.md)
+- [x] Phase 8: Hardening (coverage, profiling, ASSUMPTIONS.md, LIMITATIONS.md)
 
-## Current work (resume here if a session stopped mid-phase)
+## Current work
 
-Phase 8 plan: coverage report (`pytest --cov`) and tests until engine, book and portfolio
-modules are above 85%; profile a one-day replay (synthetic 24 h, plus the recorded sample) and
-speed up hot spots until it runs under 60 s; write docs/ASSUMPTIONS.md (fee model date,
-latency, queue model limits, resolution-risk assumptions) and docs/LIMITATIONS.md (what the
-simulator cannot predict). Then the final review at the end of this file. Check `git log`.
+None. All phases and the final review are done. Remaining work is the "Needs live
+verification" list below.
+
+## Performance (one-day replay, SYNTHETIC DATA, `make bench`)
+
+441,596 events (24 h, 9 markets, 18 tokens) generated in 1.8 s. Backtest time per strategy:
+complementary 4.3 s, cross_platform 7.2 s, logical 1.5 s, market_making 7.1 s,
+near_resolution 3.2 s, negrisk_sum 4.5 s (60k to 300k events/s). Target was under 60 s.
+At the live sample's rate (about 220 deltas/s across 176 tokens), a full recorded day of all
+176 tokens is about 19M events, roughly 5 minutes; about 20 tokens fit under 60 s.
 
 ## Synthetic stress results (SYNTHETIC DATA, default SyntheticConfig, 6 h, seed 42)
 
@@ -40,8 +45,9 @@ Run `uv run pmsim backtest --strategy NAME --stress` to reproduce.
 | market_making | -$421.70 | -$421.70 | -$212.11 | -$421.70 | fail | n/a |
 
 Notes, read before quoting any number above:
-- The three arbitrage passes come from mispricings the generator injects on purpose. Real books
-  may never show them; Polymarket's YES and NO books are linked by the matching engine.
+- The three arbitrage passes come from mispricings the generator injects on purpose. In the recorded
+  live sample all 78 two-sided binary markets had mirrored YES/NO books and none had an ask sum
+  below $1, so strategy 1 looks structurally dead on Polymarket.
 - Latency x3 changes nothing because synthetic books update every 5 s. The latency stress is
   only meaningful on recorded data.
 - Cross-platform realized PnL is mostly resolution luck: with 4 markets, one 2% Kalshi
@@ -52,10 +58,18 @@ Notes, read before quoting any number above:
 
 ## Final review (after Phase 8)
 
-- [ ] Run `make check` and the full test suite
-- [ ] Re-read the safety rules in CLAUDE.md and confirm each holds
-- [ ] Write a short "how to run it" section in README.md
-- [ ] Set `STATUS: DONE` at the top of this file
+- [x] Run `make check` and the full test suite (202 tests, 97.7% coverage on engine and book)
+- [x] Re-read the safety rules in CLAUDE.md and confirm each holds:
+  - No real orders, signing or keys: no trading or signing packages, no order endpoints, GET-only
+    HTTP client; enforced by tests/test_no_trading.py. Secret scan of src, tests, scripts, config
+    and docs found nothing.
+  - No profitability claims: every result is labeled synthetic or recorded; the synthetic
+    passes are explained as injected mispricings, and recorded data shows no complementary edge.
+  - Small typed functions, no dead code: mypy strict passes; an unreferenced-definition scan
+    removed `Position.avg_price` and added a test for `KalshiClient`.
+  - LaTeX for math in docs: METRICS, ASSUMPTIONS, LIMITATIONS and DECISIONS formulas.
+- [x] Write a short "how to run it" section in README.md
+- [x] Set `STATUS: DONE` at the top of this file
 
 ## Needs live verification (on a machine that can reach Polymarket)
 
@@ -76,6 +90,11 @@ Notes, read before quoting any number above:
 
 (newest first; one line per session: UTC time, phase, result)
 
+- 2026-10-27T08:25Z: Phase 8 and final review done, `make check` passes (202 tests, coverage gate 85%,
+  actual 97.7%). Profiling found full scans of all orders, quotes and leg groups; indexing and
+  binary search made runs about 7x faster and a 24 h synthetic day replays in under 8 s.
+  Wrote ASSUMPTIONS.md and LIMITATIONS.md; a recorded-data check showed YES/NO books mirror
+  exactly (78/78 markets). STATUS set to DONE.
 - 2026-10-27T08:07Z: Phase 7 done, `make check` passes (201 tests). `pmsim paper` drives the backtest loop
   from the live WebSocket feed through the recorder (same fill model), logs every decision with
   a reason to JSONL, saves state atomically and resumes it. Safeguard tests fail on trading or

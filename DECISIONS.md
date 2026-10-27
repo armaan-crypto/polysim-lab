@@ -17,10 +17,10 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: GET cache on disk keyed by URL plus params, 300 s TTL. Repeated fetches during development stay off the network.
 - 2026-10-27: Recorder sends the documented text `PING` every 10 s and reconnects with capped exponential backoff.
 - 2026-10-27: `recv_ts_ms - exchange_ts_ms` was -5 to +2229 ms live. Clock skew is small but can be negative; latency modeling must not assume ordering.
-- 2026-10-27: Fee docs read on 2026-10-27: taker fee = C * feeRate * p * (1 - p), makers pay none, rate by category (geopolitics 0). Catalog stores feeSchedule.rate per market.
-- 2026-10-27: Integer units: price 1e-4, size 1e-6 shares, cash = price * size (1 USDC = 1e10). Fills and conservation checks are exact.
+- 2026-10-27: Fee docs read on 2026-10-27: taker fee $= C \cdot r \cdot p(1-p)$, makers pay none, rate by category (geopolitics 0). Catalog stores feeSchedule.rate per market.
+- 2026-10-27: Integer units: price $10^{-4}$, size $10^{-6}$ shares, cash = price $\times$ size ($1$ USDC $= 10^{10}$). Fills and conservation checks are exact.
 - 2026-10-27: Fees rounded to whole micro-USDC per fill. The docs give no rounding rule; USDC has 6 decimals.
-- 2026-10-27: All 500 live fee schedules have exponent 1, so the documented formula C * rate * p * (1 - p) is used as is. Markets with no schedule (null feeType) use `default_taker_rate` 0.05, the conservative "Other / General" rate.
+- 2026-10-27: All 500 live fee schedules have exponent 1, so the documented formula $C \cdot r \cdot p(1-p)$ is used as is. Markets with no schedule (null feeType) use `default_taker_rate` 0.05, the conservative "Other / General" rate.
 - 2026-10-27: Gas or settlement cost is charged per fill (`gas_per_trade_usd`). Conservative for orders that fill in pieces.
 - 2026-10-27: L2 replay uncross rule: the newest level wins and crossed opposite levels are dropped. Feed deltas for the two sides can arrive out of order.
 - 2026-10-27: The feed reports best_ask 1 and best_bid 0 for an empty side. Replay of a live 20 s recording matched the feed's best prices on all 160 tokens under that convention.
@@ -30,11 +30,11 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: Resting orders fill only from trade prints at or through their price, after the queue ahead. Queue ahead starts at the visible level size and only shrinks with trades or when the level shrinks below it. The WS trade `side` is not used: the docs do not say whose side it is.
 - 2026-10-27: Orders that would cross our own resting orders are rejected. No self-trades, and our orders never cross.
 - 2026-10-27: Validation happens at exchange arrival time, so a tick-size change in flight applies.
-- 2026-10-27: Buy fees and gas go into cost basis; sell fees reduce realized PnL. Keeps cash + cost basis = initial cash + realized exactly (property tested).
+- 2026-10-27: Buy fees and gas go into cost basis; sell fees reduce realized PnL. Keeps $\text{cash} + \sum \text{cost} = C_0 + \text{realized}$ exactly (property tested).
 - 2026-10-27: Average-cost method, integer division on partial sells; a full close removes all remaining basis. No rounding drift.
 - 2026-10-27: No short selling and no negative cash: the portfolio raises like the venue would refuse.
-- 2026-10-27: Annualized return per closed position is simple: (PnL / time-weighted capital) * (year / holding time). Compounding blows up on short holds.
-- 2026-10-27: Idle cash = integral of cash / (integral of cash + integral of cost basis). Measures how much capital sat unused.
+- 2026-10-27: Annualized return per closed position is simple: $\frac{\Pi}{\bar K} \cdot \frac{Y}{T}$. Compounding blows up on short holds.
+- 2026-10-27: Idle cash $= \int c\,dt \,/\, (\int c\,dt + \int K\,dt)$. Measures how much capital sat unused.
 - 2026-10-27: Neg-risk conversion follows the docs (1 NO -> 1 YES in every other market). NO basis carries to the YES legs, split evenly. Multi-NO conversions are not modeled; they are repeated single conversions plus merges.
 - 2026-10-27: Merge (YES + NO -> $1) included: docs list it, and complementary arbitrage can exit without waiting for resolution.
 - 2026-10-27: 50/50 only for binary markets; neg-risk groups never split (docs). Void refunds cost basis; Polymarket documents no void, so default p_void is 0.
@@ -51,7 +51,7 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: Logical relations are curated by hand in config. Inferring implication from text is error-prone.
 - 2026-10-27: Market maker sells only inventory it holds (no shorting on Polymarket), quotes post-only, and skews linearly against inventory.
 - 2026-10-27: Kalshi: read-only client plus a mock quote feed. YES ask = 1 - best NO bid (docs). Kalshi fee rate is a config assumption (0.07, same form as Polymarket); the docs pages found give rounding, not the schedule.
-- 2026-10-27: Cross-platform mismatch score: 0.7 * (1 - Jaccard of numbers, months and source domains) + 0.3 * end-date gap over 7 days. A penalty of lambda * m per share comes off the edge.
+- 2026-10-27: Cross-platform mismatch score: $0.7\,(1 - J) + 0.3 \min(1, \Delta t / 7\text{ d})$ with $J$ the Jaccard overlap of numbers, months and source domains. A penalty of $\lambda m$ per share comes off the edge.
 - 2026-10-27: Backtest applies all events with one timestamp before strategies react, once per touched token. One feed message often moves YES and NO together; reacting in between showed a fake arbitrage (found in the first synthetic run).
 - 2026-10-27: The strategy book view shows depth net of what we already took (`FillEngine.visible`). Without it a strategy re-reads liquidity it consumed on a frozen book and its legs fail.
 - 2026-10-27: Cash and shares are reserved for open orders before a new intent is accepted. The venue refuses orders the account cannot cover.
@@ -65,7 +65,7 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: Metrics count closed positions (not fills) for hit rate and PnL per position, and entries that carried an edge for edge per entry. Fills split one decision into many pieces.
 - 2026-10-27: Sharpe uses equity samples every `equity_every_ms` with zero risk-free rate, annualized by samples per year. Mark-to-market noise inflates it on short runs.
 - 2026-10-27: Annualized return on locked capital is simple, not compounded. Short holds would explode under compounding.
-- 2026-10-27: Slippage = theoretical edge - net PnL, so it includes leg failures, unwinds and resolution surprises, not only price slippage.
+- 2026-10-27: Slippage $=$ theoretical edge $- \Pi$, so it includes leg failures, unwinds and resolution surprises, not only price slippage.
 - 2026-10-27: The HTML report is one static file with the chart inlined as base64 PNG and all text escaped. Easy to share, no server.
 - 2026-10-27: Synthetic data gained nested subset/superset pairs with injected violations. Without them the logical strategy never ran.
 - 2026-10-27: Paper trading reuses the backtest loop and the recorder's WebSocket client through a `Sink` protocol. One fill model and one parser for history and live.
@@ -73,3 +73,7 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: Paper decisions stream to JSONL and are dropped from memory once written. Long sessions stay bounded.
 - 2026-10-27: Restart restores the portfolio but not open simulated orders or strategy leg state (cancel-on-disconnect). Simple and safe.
 - 2026-10-27: Safeguard tests scan the source AST: no trading or signing packages, no order or cancel endpoint literals, no write calls on HTTP clients, no HTTP write method literals, and none of those packages in dependencies.
+- 2026-10-27: Open orders are indexed by token in the fill engine, and quote and trade lookups use binary search. Profiling showed full scans of every order ever placed; the 2 h market-making run went from 15.1 s to 2.2 s.
+- 2026-10-27: Leg manager tracks only open groups plus a per-token busy counter. Scanning all historical groups made long runs quadratic.
+- 2026-10-27: `make check` enforces 85% coverage on `pmsim.engine` and `pmsim.book` (portfolio lives in engine). The spec's floor, checked every run.
+- 2026-10-27: Recorded sample check: 78/78 binary markets had mirrored YES/NO books, 0 with ask sum < $1. Documented in LIMITATIONS: complementary arbitrage looks structurally absent.

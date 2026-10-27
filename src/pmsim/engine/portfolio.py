@@ -29,10 +29,6 @@ class Position:
     opened_ts: int | None = None
     capital_ms: int = 0  # integral of cost basis over time
 
-    def avg_price(self) -> float:
-        """Average cost per share in price units (fees included)."""
-        return self.cost / self.size if self.size else 0.0
-
     def unrealized(self, mark: int) -> int:
         return self.size * mark - self.cost
 

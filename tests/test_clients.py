@@ -107,3 +107,24 @@ def test_data_api_trades(make_http: MakeHttp) -> None:
     assert {t.side for t in trades} <= {"BUY", "SELL"}
     assert all(0 < t.price < 1 and t.size > 0 for t in trades)
     assert seen[0].url.params["market"] == "0xabc"
+
+
+def test_kalshi_client_reads_fixtures(make_http: MakeHttp) -> None:
+    from pmsim.data.kalshi import KalshiClient
+
+    ticker = load_fixture("kalshi_market.json")["market"]["ticker"]
+    http, seen = make_http(
+        {
+            f"/v2/markets/{ticker}": load_fixture("kalshi_market.json"),
+            f"/v2/markets/{ticker}/orderbook": load_fixture("kalshi_orderbook.json"),
+        }
+    )
+    client = KalshiClient(http, "https://k/v2/")
+    market = client.market(ticker)
+    quote = client.quote(ticker, ts=9)
+    assert market.ticker == ticker and market.status == "active"
+    assert quote.ts == 9 and quote.yes_ask == round(market.yes_ask * 10_000)
+    assert [r.url.path for r in seen] == [
+        f"/v2/markets/{ticker}",
+        f"/v2/markets/{ticker}/orderbook",
+    ]
