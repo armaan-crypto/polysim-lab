@@ -46,6 +46,10 @@ class Market(_Api):
     resolution_source: str = Field(default="", alias="resolutionSource")
     tags: list[Tag] = Field(default_factory=list)
     neg_risk: bool = Field(default=False, alias="negRisk")
+    neg_risk_market_id: str = Field(default="", alias="negRiskMarketID")
+    neg_risk_other: bool = Field(default=False, alias="negRiskOther")
+    group_item_title: str = Field(default="", alias="groupItemTitle")
+    event_id: str = Field(default="", alias="events")
     tick_size: float = Field(alias="orderPriceMinTickSize")
     min_order_size: float = Field(alias="orderMinSize")
     fees_enabled: bool = Field(default=False, alias="feesEnabled")
@@ -56,6 +60,14 @@ class Market(_Api):
     accepting_orders: bool = Field(default=False, alias="acceptingOrders")
 
     _decode_lists = field_validator("outcomes", "token_ids", mode="before")(_json_list)
+
+    @field_validator("event_id", mode="before")
+    @classmethod
+    def _first_event_id(cls, value: object) -> object:
+        """Gamma nests the parent event as `events: [{"id": ...}]`."""
+        if isinstance(value, list):
+            return str(value[0]["id"]) if value else ""
+        return value
 
 
 class BookLevel(_Api):

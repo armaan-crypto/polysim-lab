@@ -19,3 +19,17 @@ api:
   backoff_s: 0.5             # doubles per retry
   timeout_s: 15.0
   cache_ttl_s: 300.0         # 0 disables the local GET cache
+resolution:
+  # Probabilities are ASSUMPTIONS (not calibrated). Timings follow the UMA docs.
+  redeem_cost_usd: 0.0
+  classes:                   # first class whose tag a market carries wins
+    sports: [sports]
+    crypto: [crypto]
+    politics: [politics, elections]
+  profiles:
+    default: {p_late_proposal: 0.10, late_proposal_mean_hours: 24, challenge_hours: 2,
+              p_dispute: 0.02, dispute_extra_hours: 118, p_reversal: 0.25,
+              p_fifty_fifty: 0.002, p_void: 0.0}
+    sports: {p_late_proposal: 0.05, late_proposal_mean_hours: 6, p_dispute: 0.01}
+    crypto: {p_late_proposal: 0.02, late_proposal_mean_hours: 2, p_dispute: 0.005}
+    politics: {p_late_proposal: 0.15, late_proposal_mean_hours: 48, p_dispute: 0.05}

@@ -41,6 +41,37 @@ class ApiConfig(BaseModel):
     cache_ttl_s: float = Field(default=300.0, ge=0)
 
 
+class ResolutionRisk(BaseModel):
+    """Resolution risk for one market class. Probabilities are assumptions, not measured.
+
+    Timings follow the UMA flow in the docs (checked 2026-10-27): a 2 hour
+    challenge period, and 4 to 6 days in total when disputed.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    p_late_proposal: float = Field(default=0.10, ge=0, le=1)
+    late_proposal_mean_hours: float = Field(default=24.0, ge=0)
+    challenge_hours: float = Field(default=2.0, ge=0)
+    p_dispute: float = Field(default=0.02, ge=0, le=1)
+    dispute_extra_hours: float = Field(default=118.0, ge=0)
+    p_reversal: float = Field(default=0.25, ge=0, le=1)  # given a dispute
+    p_fifty_fifty: float = Field(default=0.002, ge=0, le=1)  # binary markets only
+    p_void: float = Field(default=0.0, ge=0, le=1)
+
+
+class ResolutionConfig(BaseModel):
+    """Per-class risk profiles. A market's class is the first whose tags it carries."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    classes: dict[str, list[str]] = Field(default_factory=dict)
+    profiles: dict[str, ResolutionRisk] = Field(
+        default_factory=lambda: {"default": ResolutionRisk()}
+    )
+    redeem_cost_usd: float = Field(default=0.0, ge=0)
+
+
 class Config(BaseModel):
     """Top-level simulator configuration."""
 
@@ -51,6 +82,7 @@ class Config(BaseModel):
     latency_ms: int = Field(default=150, ge=0)
     fees: FeeConfig = FeeConfig()
     api: ApiConfig = ApiConfig()
+    resolution: ResolutionConfig = ResolutionConfig()
 
 
 def load_config(path: Path | str) -> Config:

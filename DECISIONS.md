@@ -30,3 +30,14 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: Resting orders fill only from trade prints at or through their price, after the queue ahead. Queue ahead starts at the visible level size and only shrinks with trades or when the level shrinks below it. The WS trade `side` is not used: the docs do not say whose side it is.
 - 2026-10-27: Orders that would cross our own resting orders are rejected. No self-trades, and our orders never cross.
 - 2026-10-27: Validation happens at exchange arrival time, so a tick-size change in flight applies.
+- 2026-10-27: Buy fees and gas go into cost basis; sell fees reduce realized PnL. Keeps cash + cost basis = initial cash + realized exactly (property tested).
+- 2026-10-27: Average-cost method, integer division on partial sells; a full close removes all remaining basis. No rounding drift.
+- 2026-10-27: No short selling and no negative cash: the portfolio raises like the venue would refuse.
+- 2026-10-27: Annualized return per closed position is simple: (PnL / time-weighted capital) * (year / holding time). Compounding blows up on short holds.
+- 2026-10-27: Idle cash = integral of cash / (integral of cash + integral of cost basis). Measures how much capital sat unused.
+- 2026-10-27: Neg-risk conversion follows the docs (1 NO -> 1 YES in every other market). NO basis carries to the YES legs, split evenly. Multi-NO conversions are not modeled; they are repeated single conversions plus merges.
+- 2026-10-27: Merge (YES + NO -> $1) included: docs list it, and complementary arbitrage can exit without waiting for resolution.
+- 2026-10-27: 50/50 only for binary markets; neg-risk groups never split (docs). Void refunds cost basis; Polymarket documents no void, so default p_void is 0.
+- 2026-10-27: Resolution timing from the UMA docs: 2 h challenge, 4 to 6 days when disputed (118 extra hours, so about 5 days total). Probabilities of late proposals, disputes and reversals are labeled assumptions per market class.
+- 2026-10-27: Market class = first configured class whose tags the market carries, else "default". Class profiles only override the fields they set.
+- 2026-10-27: Catalog gains event_id, neg_risk_market_id, group_item_title and neg_risk_other (from Gamma). Needed to build neg-risk groups.

@@ -1,5 +1,5 @@
 STATUS: IN_PROGRESS
-LOCK: 2026-10-27T07:22Z
+LOCK: 2026-10-27T07:27Z
 
 # Progress
 
@@ -10,7 +10,7 @@ Details for each phase are in docs/BUILD_SPEC.md.
 - [x] Phase 0: Scaffold (layout, pyproject, Makefile, config, README with Mermaid)
 - [x] Phase 1: Data layer (Gamma and CLOB clients, recorder, catalog, fixtures, CLI)
 - [x] Phase 2: Order book and matching engine (book, replay, fills, fees, property tests)
-- [ ] Phase 3: Portfolio, resolution and accounting (PnL, resolution risk, neg-risk)
+- [x] Phase 3: Portfolio, resolution and accounting (PnL, resolution risk, neg-risk)
 - [ ] Phase 4: Strategy framework (interface, lookahead guard, six reference strategies)
 - [ ] Phase 5: Backtester and experiment runner (event-driven, sweeps, synthetic data, stress)
 - [ ] Phase 6: Metrics and reports (metrics, theory vs realized edge, HTML report)
@@ -38,6 +38,9 @@ Details for each phase are in docs/BUILD_SPEC.md.
 
 (newest first; one line per session: UTC time, phase, result)
 
+- 2026-10-27T07:27Z: Phase 3 done, `make check` passes. Portfolio (average cost, PnL, lock-up, idle cash, merge,
+  neg-risk conversion), resolution payouts and settlement, seeded resolution-risk simulator with
+  per-class profiles (assumed probabilities, documented UMA timings). Next: Phase 4 (strategies).
 - 2026-10-27T07:15Z: Phase 2 done, `make check` passes (92 tests, hypothesis properties for L2, L3 and
   the fill engine). Property test found an unknown-id cancel crash, fixed. Live replay of a 20 s
   recording matches the feed's best bid/ask on 160/160 tokens. Next: Phase 3 (portfolio, resolution).

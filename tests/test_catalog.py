@@ -28,6 +28,15 @@ def test_one_row_per_token(markets: list[Market]) -> None:
     assert df.filter(pl.col("neg_risk")).height == 2
 
 
+def test_event_and_neg_risk_fields(markets: list[Market]) -> None:
+    df = build_catalog(markets)
+    nr = df.filter(pl.col("neg_risk"))
+    assert nr["event_id"].to_list() == ["606422", "606422"]
+    assert nr["neg_risk_market_id"][0].startswith("0x")
+    assert nr["group_item_title"][0] == "No change"
+    assert df.filter(~pl.col("neg_risk"))["neg_risk_market_id"].to_list() == ["", ""]
+
+
 def test_status_and_fee_fields(markets: list[Market]) -> None:
     df = build_catalog(markets)
     assert set(df["status"]) == {"open"}
