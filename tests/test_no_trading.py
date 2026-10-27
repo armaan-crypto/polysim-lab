@@ -13,22 +13,11 @@ import tomllib
 from pathlib import Path
 
 import pmsim
+from pmsim.safety import FORBIDDEN_MODULES, forbidden_imports
 
 SRC = Path(pmsim.__file__).parent
 ROOT = SRC.parents[1]
 
-# Packages that can sign transactions or talk to trading APIs.
-FORBIDDEN_MODULES = (
-    "py_clob_client",
-    "py_order_utils",
-    "eth_account",
-    "eth_keys",
-    "web3",
-    "coincurve",
-    "ecdsa",
-    "kalshi_python",
-    "solcx",
-)
 # CLOB order-placing and cancel paths (docs), as string literals in code.
 ENDPOINT = re.compile(
     r"""["'][^"']*/(order|orders|cancel|cancel-all|cancel-orders|cancel-market-orders"""
@@ -40,7 +29,8 @@ HTTP_HINTS = ("client", "http", "requests", "session")
 
 
 def sources() -> list[Path]:
-    return sorted(SRC.rglob("*.py"))
+    """Package code plus the user algorithms folder."""
+    return sorted(SRC.rglob("*.py")) + sorted((ROOT / "algorithms").glob("*.py"))
 
 
 def test_no_forbidden_imports_in_source() -> None:
@@ -117,3 +107,11 @@ def test_write_check_catches_examples() -> None:
     call = next(n for n in ast.walk(ok) if isinstance(n, ast.Call))
     assert isinstance(call.func, ast.Attribute)
     assert not any(h in _receiver(call.func.value) for h in HTTP_HINTS)
+
+
+def test_forbidden_imports_helper() -> None:
+    assert forbidden_imports("import web3\nfrom py_clob_client.client import X") == [
+        "web3",
+        "py_clob_client.client",
+    ]
+    assert forbidden_imports("import json") == []

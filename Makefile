@@ -3,8 +3,8 @@
 check: lint typecheck test
 
 lint:
-	uv run ruff check src tests
-	uv run ruff format --check src tests
+	uv run ruff check src tests algorithms
+	uv run ruff format --check src tests algorithms
 
 typecheck:
 	uv run mypy
