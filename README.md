@@ -33,25 +33,37 @@ flowchart LR
 ## Dashboard
 
 ```
-uv run pmsim ui          # opens http://127.0.0.1:8765
+uv run pmsim ui          # opens http://127.0.0.1:8765 (localhost works too)
 ```
 
-A local web dashboard with a Polymarket-inspired look (its own styling, not
-Polymarket's assets; not affiliated):
+A local web app that works like Polymarket, with paper money:
 
-- **Markets**: catalog grouped by event with chance, Yes/No prices and 24 h
-  volume from the last `pmsim fetch`; click a market for its recorded order
-  book.
-- **Backtest**: pick a strategy, synthetic or recorded data and parameters;
-  see PnL, risk metrics, the equity curve, stress tests, theory vs realized
-  edge, every trade and every rejected order.
-- **Compare**: all six strategies on the same data, theory vs realized.
-- **Paper trading**: live view of `pmsim paper` sessions, refreshed every 3 s.
+- **Markets**: every open Polymarket event, live from the public API, with
+  chances, Yes/No prices and volume. Search and browse by category.
+- **Market page**: price chart (1H to All), live order book, and a Buy/Sell
+  panel with market and limit orders. Market orders fill against the real
+  live book (you pay the real spread and depth); limit orders rest until the
+  live price reaches them. Nothing is ever sent to Polymarket.
+- **Portfolio**: cash, positions valued at live prices, P&L, open orders and
+  trade history. Positions settle automatically when a market resolves.
+  "Reset paper account" starts over.
+- **Bots**: build a bot without code. Pick a market and outcome, choose
+  "Buy the dip" or "Ride a breakout", set entry, take-profit, stop-loss and
+  size, backtest it on that market's real price history, then start it.
+  Running bots trade the paper account while the dashboard is running.
+- **Strategy lab**: run the six research algorithms (or your own) on
+  simulated or recorded data with presets, stress tests and a plain-English
+  verdict, or compare them all.
 
-Links like `#backtest?strategy=logical&hours=6&stress=1&run=1` or
-`#markets?q=fed` open a configured view. It follows the system light or dark
-setting; the Theme button overrides it. The server binds to 127.0.0.1 and only
-runs simulations and reads local files.
+### Your own algorithms
+
+Copy `algorithms/example_momentum.py`, edit it, and reload the dashboard: it
+appears in the Strategy lab with a settings form built from its `Config`.
+Files that import trading or signing libraries are refused.
+
+Links like `#event/<slug>`, `#bots/new?event=<slug>`, `#lab?algo=logical&run=1`
+or `#markets?q=fed` open a view directly. The server only answers on
+localhost and rejects requests from other websites.
 
 ## How to run it
 

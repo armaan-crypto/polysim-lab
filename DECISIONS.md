@@ -84,3 +84,11 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: Catalog gains Gamma's `outcomePrices`, `volume24hr`, `volumeNum`, `icon` (falling back to the event icon) and the event title, so market cards show real prices as of the last fetch.
 - 2026-10-27: Decision-log lines are plain text ("BUY 50.00 @ 99.1c GTC token") instead of Python reprs. Easier to read in the paper log and the UI.
 - 2026-10-27: Trade times in the UI are elapsed since run start; synthetic clocks start at 0, so wall-clock times would mislead.
+- 2026-10-27: Dashboard trading uses a simulated `PaperAccount` against live Polymarket books (read-only API). Lets you trade like on Polymarket while the no-real-orders rule holds.
+- 2026-10-27: Market buys take a dollar amount and sells take shares, like Polymarket's ticket. Limit orders rest and fill at their price when a later live book crosses them.
+- 2026-10-27: Bots are one no-code rule (enter below/above a price, take profit, stop loss, size, exposure cap, cooldown) shared by backtests and live runs via `decide`. Simple enough to build in a form; same behavior everywhere.
+- 2026-10-27: Bot backtests replay real price history with a modeled one-tick book (label "historical"). Polymarket's public API has price history but no historical books.
+- 2026-10-27: A background desk thread fills resting orders (5 s), settles resolved markets (60 s) and runs bots. Bots live in the dashboard process only.
+- 2026-10-27: User algorithms load from `algorithms/*.py`; files importing trading or signing packages are refused and the safety tests scan that folder too.
+- 2026-10-27: The local server checks the Host header (loopback only) and requires a JSON body with a same-origin Origin for writes. Stops other websites in the browser from trading the paper account or running jobs.
+- 2026-10-27: Dropped the recorded-catalog market view and the CLI paper-session viewer from the dashboard. The live market pages and bots replace them; `pmsim paper` still works from the CLI.

@@ -66,3 +66,16 @@ forward folds are small. Treat any single number as anecdote.
 
 Paper trading uses the same fill model on live data, so it shares every
 limit above. A restart drops open simulated orders and multi-leg state.
+
+## Paper trading desk (dashboard)
+
+- Market orders walk the live book once, at the moment you click. A real
+  order could see the book move between your click and the match.
+- Resting limit orders fill when a later live book crosses their price,
+  checked every 5 seconds, at the limit price. Real limit orders can fill
+  earlier (a taker hits you between checks) or not at all (queue ahead).
+- Bot backtests use the market's real price history but a modeled book (one
+  tick spread, deep size), so they overstate fills on thin markets.
+- Bots and limit orders only run while `pmsim ui` is running.
+- Resolution uses Gamma's final `outcomePrices` once `umaResolutionStatus`
+  is `resolved`, checked every minute.

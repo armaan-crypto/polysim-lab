@@ -90,6 +90,11 @@ Notes, read before quoting any number above:
 
 (newest first; one line per session: UTC time, phase, result)
 
+- 2026-10-27T15:23Z: Dashboard now works like Polymarket with paper money: live markets and books, buy/sell
+  with market and limit orders, portfolio with auto settlement, no-code bots with real-history
+  backtests and live paper runs, strategy lab with presets and custom algorithms. Added a request
+  guard and localhost IPv6. `make check` passes (242 tests). Verified live: $20 buy filled at the
+  live ask, bot backtest and start worked.
 - 2026-10-27T14:42Z: Added the local dashboard (`pmsim ui`, user request after STATUS DONE): Polymarket-style
   markets view with recorded order books, backtest, compare and paper views; JSON API with tests
   (222 tests, `make check` passes). Catalog now stores prices, volume, icons and event titles.
