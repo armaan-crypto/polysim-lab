@@ -60,6 +60,7 @@ class Decision:
     ts: int
     kind: str
     detail: str
+    reason: str
 
 
 @dataclass
@@ -133,15 +134,24 @@ class _Orders:
 
 
 class Backtest:
-    def __init__(self, strategy: Strategy, data: MarketData, cfg: BacktestConfig | None = None):
+    def __init__(
+        self,
+        strategy: Strategy,
+        data: MarketData,
+        cfg: BacktestConfig | None = None,
+        start_ts: int | None = None,
+        portfolio: Portfolio | None = None,
+    ):
+        """`start_ts` and `portfolio` let a live paper session start now or resume saved state."""
         self.cfg = cfg or BacktestConfig()
         self.strategy = strategy
         self.data = data
         uni = data.universe
-        self.clock = Clock(data.events[0].ts if data.events else 0)
+        first = data.events[0].ts if data.events else 0
+        self.clock = Clock(first if start_ts is None else start_ts)
         self.gas = usd_to_cash(self.cfg.gas_per_trade_usd)
         self.engine = FillEngine(uni.rules, self.cfg.latency_ms, self.gas)
-        self.portfolio = Portfolio(usd_to_cash(self.cfg.cash_usd), now=self.clock.now)
+        self.portfolio = portfolio or Portfolio(usd_to_cash(self.cfg.cash_usd), now=self.clock.now)
         self.kalshi_fees = FeeModel(self.cfg.kalshi_fee_rate)
         self.book_times: dict[str, int] = {}
         self.order_intent: dict[int, OrderIntent] = {}
@@ -188,20 +198,20 @@ class Backtest:
         for batch in _same_time(events):
             ts = batch[0].ts
             while timer <= ts:
-                next_equity = self._timer(timer, next_equity)
+                next_equity = self.process_timer(timer, next_equity)
                 timer += self.cfg.timer_ms
             while pending and pending[0].ts <= ts:
                 self._resolve(pending.pop(0))
-            self._batch(batch)
+            self.process_batch(batch)
         while timer <= end:
-            next_equity = self._timer(timer, next_equity)
+            next_equity = self.process_timer(timer, next_equity)
             timer += self.cfg.timer_ms
         for res in pending:
             self._resolve(res)
         self._sample_equity(self.clock.now)
         return self._result()
 
-    def _batch(self, batch: list[MarketEvent]) -> None:
+    def process_batch(self, batch: list[MarketEvent]) -> None:
         """Apply every event stamped at one time, then let the strategy react once per token.
 
         One feed message often updates the YES and NO books together; reacting
@@ -218,13 +228,13 @@ class Backtest:
             elif isinstance(ev, TradePrint):
                 trades.append(ev)
             elif isinstance(ev, TickChange):
-                self._log("tick", f"{ev.token} tick -> {ev.tick}")
+                self._log("tick", f"{ev.token} tick -> {ev.tick}", "venue changed tick size")
         for token in touched:
             self._submit(self.strategy.on_book(BookUpdate(token, self.clock.now)))
         for trade in trades:
             self._submit(self.strategy.on_trade(trade))
 
-    def _timer(self, t: int, next_equity: int) -> int:
+    def process_timer(self, t: int, next_equity: int) -> int:
         self.clock.set(max(self.clock.now, t))
         self._on_fills(self.engine.advance(t))
         self.portfolio.advance(max(self.portfolio.now, t))
@@ -244,7 +254,11 @@ class Backtest:
             if pos is not None and pos.size and pos.size * payout < pos.cost:
                 self.resolution_losses += 1
         settle(self.portfolio, res, usd_to_cash(self.cfg.redeem_cost_usd))
-        self._log("resolution", f"{res.kind} disputed={res.disputed} reversed={res.reversed}")
+        self._log(
+            "resolution",
+            f"{res.kind} disputed={res.disputed} reversed={res.reversed}",
+            "market resolved; positions redeemed",
+        )
         self._submit(self.strategy.on_resolution(res))
 
     # ---- intents and fills ----------------------------------------------------
@@ -253,7 +267,9 @@ class Backtest:
         for intent in intents:
             self.intents += 1
             if isinstance(intent, CancelIntent):
-                if not self.engine.cancel(intent.order_id, self.clock.now):
+                if self.engine.cancel(intent.order_id, self.clock.now):
+                    self._log("cancel", f"#{intent.order_id}", f"{self.strategy.name} requested")
+                else:
                     self._reject("unknown order", intent)
             elif isinstance(intent, ExternalIntent):
                 self._external(intent)
@@ -267,7 +283,9 @@ class Backtest:
                 self.order_intent[order.id] = intent
                 self.expected_edge += intent.edge
                 self.edge_orders += intent.edge != 0
-                self._log("order", f"#{order.id} {intent}")
+                edge = intent.edge / CASH_SCALE
+                why = f"{self.strategy.name}:{intent.tag or 'order'} edge ${edge:.4f}"
+                self._log("order", f"#{order.id} {intent}", why)
 
     def _unaffordable(self, intent: OrderIntent) -> str:
         rules = self.engine.rules.get(intent.token)
@@ -301,7 +319,11 @@ class Backtest:
         for fill in fills:
             self._apply(fill)
             intent = self.order_intent[fill.order_id]
-            self._log("fill", f"#{fill.order_id} {fill.side} {fill.size}@{fill.price}")
+            self._log(
+                "fill",
+                f"#{fill.order_id} {fill.side} {fill.size}@{fill.price}",
+                f"{fill.liquidity} fill under the fill model",
+            )
             self._submit(self.strategy.on_fill(fill, intent))
 
     def _external(self, intent: ExternalIntent) -> None:
@@ -327,17 +349,17 @@ class Backtest:
             return
         token = leg_token(intent.ticker, intent.outcome)
         self._apply(Fill(-1, token, "BUY", ask, qty, arrive, "taker", fee, 0))
-        self._log("external_fill", f"{token} {qty}@{ask}")
+        self._log("external_fill", f"{token} {qty}@{ask}", "mock venue filled at its quote")
         self._submit(self.strategy.on_external_fill(intent, qty, ask))
 
     # ---- bookkeeping -------------------------------------------------------------
 
     def _reject(self, reason: str, intent: Intent) -> None:
         self.rejects[reason] += 1
-        self._log("reject", f"{reason}: {intent}")
+        self._log("reject", f"{intent}", reason)
 
-    def _log(self, kind: str, detail: str) -> None:
-        self.decisions.append(Decision(self.clock.now, kind, detail))
+    def _log(self, kind: str, detail: str, reason: str) -> None:
+        self.decisions.append(Decision(self.clock.now, kind, detail, reason))
 
     def marks(self) -> dict[str, int]:
         """Mark each held token at mid, else last trade, else its average cost."""

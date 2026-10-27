@@ -94,12 +94,15 @@ def test_report_html(tmp_path: Path) -> None:
     fill = Fill(1, "tok<script>", "BUY", 5000, 10**6, 5, "taker", 0, 0)
     res = result(
         fills=[fill],
-        decisions=[Decision(1, "reject", "insufficient cash: <x>"), Decision(2, "order", "ok")],
+        decisions=[
+            Decision(1, "reject", "<x>", "insufficient cash"),
+            Decision(2, "order", "ok", "why"),
+        ],
     )
     html = render(res)
     assert "SYNTHETIC DATA" in html and "data:image/png;base64," in html
     assert "tok&lt;script&gt;" in html and "<script>" not in html
-    assert "insufficient cash: &lt;x&gt;" in html and "1 leg groups failed" in html
+    assert "reject (insufficient cash): &lt;x&gt;" in html and "1 leg groups failed" in html
     out = write_report(result(label="recorded", legs=None), tmp_path / "r" / "x.html")
     text = out.read_text()
     assert "Recorded market data." in text and "No failures." in text

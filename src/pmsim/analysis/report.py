@@ -90,7 +90,8 @@ def _failure_log(res: BacktestResult) -> str:
     else:
         items_html = []
     items_html += [
-        f"<li><code>{d.ts}</code> {escape(d.kind)}: {escape(d.detail)}</li>" for d in items
+        f"<li><code>{d.ts}</code> {escape(d.kind)} ({escape(d.reason)}): {escape(d.detail)}</li>"
+        for d in items
     ]
     return "<ul>" + "".join(items_html) + "</ul>" if items_html else "<p>No failures.</p>"
 
