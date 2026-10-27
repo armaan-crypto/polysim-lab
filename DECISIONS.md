@@ -92,3 +92,4 @@ One line per design choice: date, choice, reason.
 - 2026-10-27: User algorithms load from `algorithms/*.py`; files importing trading or signing packages are refused and the safety tests scan that folder too.
 - 2026-10-27: The local server checks the Host header (loopback only) and requires a JSON body with a same-origin Origin for writes. Stops other websites in the browser from trading the paper account or running jobs.
 - 2026-10-27: Dropped the recorded-catalog market view and the CLI paper-session viewer from the dashboard. The live market pages and bots replace them; `pmsim paper` still works from the CLI.
+- 2026-10-27: Dashboard look now matches polymarket.com: Inter, its measured color tokens (light and dark), hairline-ring cards, header category row, flat market page with right-hand trade card. Own name and logo, and a visible "Paper" pill, so it never passes for the real site.

@@ -14,6 +14,7 @@ const state = {
   route: { view: "markets", arg: "", params: new URLSearchParams() },
   portfolio: null,
   markets: { data: null, error: null, tag: "", query: "" },
+  tags: [],
   event: null,
   bots: { data: null, error: null, open: {} },
   builder: null,
@@ -52,7 +53,7 @@ const fmt = {
   },
   vol(v) {
     if (!v) return "$0 Vol.";
-    if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M Vol.`;
+    if (v >= 1e6) return `$${Math.round(v / 1e6)}M Vol.`;
     if (v >= 1e3) return `$${Math.round(v / 1e3)}K Vol.`;
     return `$${Math.round(v)} Vol.`;
   },
@@ -147,7 +148,7 @@ function lineChart(el, pts, opts = {}) {
   if (!el) return;
   const w = el.clientWidth, h = el.clientHeight;
   if (!pts.length || !w) { el.innerHTML = `<p class="muted">${esc(opts.empty || "No data yet.")}</p>`; return; }
-  const pad = { l: opts.padLeft ?? 56, r: 12, t: 10, b: 24 };
+  const pad = opts.axisRight ? { l: 0, r: 44, t: 10, b: 24 } : { l: opts.padLeft ?? 56, r: 12, t: 10, b: 24 };
   const xs = pts.map((p) => p[0]);
   let ys = pts.map((p) => p[1]);
   if (opts.base !== undefined) ys = ys.concat([opts.base]);
@@ -169,10 +170,12 @@ function lineChart(el, pts, opts = {}) {
     <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="${color}" stop-opacity="0.2"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
     ${yticks.map((t) => `<line class="grid-line" x1="${pad.l}" x2="${w - pad.r}" y1="${sy(t)}" y2="${sy(t)}"/>
-      <text class="axis" x="${pad.l - 8}" y="${sy(t) + 4}" text-anchor="end">${esc(opts.yFmt ? opts.yFmt(t) : t.toFixed(2))}</text>`).join("")}
-    ${xticks.map((t) => `<text class="axis" x="${sx(t)}" y="${h - 6}" text-anchor="middle">${esc(opts.xFmt ? opts.xFmt(t) : t.toFixed(1))}</text>`).join("")}
+      <text class="axis" x="${opts.axisRight ? w - pad.r + 8 : pad.l - 8}" y="${sy(t) + 4}"
+        text-anchor="${opts.axisRight ? "start" : "end"}">${esc(opts.yFmt ? opts.yFmt(t) : t.toFixed(2))}</text>`).join("")}
+    ${xticks.map((t, i) => `<text class="axis" x="${sx(t)}" y="${h - 6}"
+      text-anchor="${opts.axisRight && i === 0 ? "start" : "middle"}">${esc(opts.xFmt ? opts.xFmt(t) : t.toFixed(1))}</text>`).join("")}
     ${opts.base !== undefined ? `<line class="base" x1="${pad.l}" x2="${w - pad.r}" y1="${sy(opts.base)}" y2="${sy(opts.base)}"/>` : ""}
-    <path d="${area}" fill="url(#${gid})"/>
+    ${opts.fill === false ? "" : `<path d="${area}" fill="url(#${gid})"/>`}
     <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
     ${markers}
     <line class="cross" y1="${pad.t}" y2="${h - pad.b}" stroke="var(--line-2)" visibility="hidden"/>
@@ -199,11 +202,11 @@ function lineChart(el, pts, opts = {}) {
 function gauge(p) {
   const v = Math.min(1, Math.max(0, p ?? 0));
   const angle = Math.PI * (1 - v);
-  const x = 32 + 26 * Math.cos(angle), y = 32 - 26 * Math.sin(angle);
-  const color = v >= 0.5 ? "var(--yes)" : "var(--no)";
-  return `<div class="gauge"><svg viewBox="0 0 64 36" aria-hidden="true">
-      <path d="M6 32 A26 26 0 0 1 58 32" fill="none" stroke="var(--line)" stroke-width="5" stroke-linecap="round"/>
-      ${v > 0.005 ? `<path d="M6 32 A26 26 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round"/>` : ""}
+  const x = 29 + 24 * Math.cos(angle), y = 29 - 24 * Math.sin(angle);
+  const color = v >= 0.5 ? "var(--yes-solid)" : "var(--no-solid)";
+  return `<div class="gauge"><svg viewBox="0 0 58 32" aria-hidden="true">
+      <path d="M5 29 A24 24 0 0 1 53 29" fill="none" stroke="var(--line)" stroke-width="4.5" stroke-linecap="round"/>
+      ${v > 0.005 ? `<path d="M5 29 A24 24 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)}" fill="none" stroke="${color}" stroke-width="4.5" stroke-linecap="round"/>` : ""}
     </svg><div class="gauge-value num">${fmt.chance(p)}</div><div class="gauge-label">chance</div></div>`;
 }
 
@@ -238,6 +241,24 @@ searchInput.addEventListener("input", debounce(() => {
   location.hash = q ? `#markets?q=${encodeURIComponent(q)}` : "#markets";
 }, 300));
 
+const tagLabel = (t) => t.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
+
+function renderCats() {
+  const { view } = state.route;
+  const tag = view === "markets" ? state.markets.tag : null;
+  const section = (v, label) => `<a class="cat section" href="#${v}"
+    ${view === v || (view === "event" && v === "markets") ? `aria-current="page"` : ""}>${label}</a>`;
+  const cat = (t, label) => `<a class="cat" href="#markets${t ? `?tag=${encodeURIComponent(t)}` : ""}"
+    ${tag === t ? `aria-current="true"` : ""}>${esc(label)}</a>`;
+  $("#cats").innerHTML = section("markets", "Markets") + section("portfolio", "Portfolio") + section("bots", "Bots")
+    + section("lab", "Lab") + `<span class="cat-sep section"></span>` + cat("", "Trending")
+    + (state.tags.length ? `<span class="cat-sep"></span>` : "") + state.tags.map((t) => cat(t, tagLabel(t))).join("");
+}
+
+async function loadTags() {
+  try { state.tags = (await request("/api/live/events?limit=1")).tags; renderCats(); } catch (err) { /* row keeps Trending only */ }
+}
+
 /* ---- routing ------------------------------------------------------------------------ */
 
 function parseHash() {
@@ -257,6 +278,8 @@ function route() {
     const on = t.dataset.view === view || (view === "event" && t.dataset.view === "markets");
     if (on) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
   });
+  if (view === "markets") state.markets.tag = state.route.params.get("tag") || "";
+  renderCats();
   ({ markets: enterMarkets, event: enterEvent, portfolio: enterPortfolio, bots: enterBots, lab: enterLab })[view]();
   window.scrollTo(0, 0);
 }
@@ -299,6 +322,7 @@ async function loadMarkets(quiet = false) {
     const q = encodeURIComponent(m.query), tag = encodeURIComponent(m.tag);
     m.data = await request(`/api/live/events?limit=120&q=${q}&tag=${tag}`);
     m.error = null;
+    if (!state.tags.length) { state.tags = m.data.tags; renderCats(); }
   } catch (err) { if (!quiet) m.error = err.message; }
   if (state.route.view === "markets") render();
 }
@@ -306,20 +330,20 @@ async function loadMarkets(quiet = false) {
 function eventCard(ev) {
   const single = ev.markets.length === 1;
   const m0 = ev.markets[0];
-  const [yesP, noP] = m0.prices.length === 2 ? m0.prices : [m0.prices[0], null];
+  const yesP = m0.prices[0];
+  const buy = (m, oi, cls, label) => `<span class="${cls}" data-act="card-buy" data-slug="${esc(ev.slug)}"
+    data-token="${esc(m.tokens[oi] || "")}">${label}</span>`;
   const body = single
-    ? `<div class="yesno">
-        <span class="y"><em>${esc(m0.outcomes[0])}</em> <b class="num">${fmt.cents(yesP)}</b></span>
-        <span class="n"><em>${esc(m0.outcomes[1] || "No")}</em> <b class="num">${fmt.cents(noP)}</b></span></div>`
-    : `<div class="outcome-rows">${ev.markets.slice(0, 3).map((m) => `
+    ? `<div class="yesno">${buy(m0, 0, "y", `<em>Buy ${esc(m0.outcomes[0])}</em>`)}${buy(m0, 1, "n", `<em>Buy ${esc(m0.outcomes[1] || "No")}</em>`)}</div>`
+    : `<div class="outcome-rows">${ev.markets.slice(0, 2).map((m) => `
         <div class="outcome-row"><span class="label">${esc(m.label)}</span>
           <span class="pct num">${fmt.chance(m.prices[0])}</span>
-          <span class="mini"><span class="tag-yes">Yes</span><span class="tag-no">No</span></span></div>`).join("")}
-        ${ev.markets.length > 3 ? `<span class="muted small">+${ev.markets.length - 3} more</span>` : ""}</div>`;
+          <span class="mini">${buy(m, 0, "tag-yes", "Yes")}${buy(m, 1, "tag-no", "No")}</span></div>`).join("")}</div>`;
   return `<a class="card" href="#event/${encodeURIComponent(ev.slug)}">
     <div class="card-top">${iconFor(ev.icon, ev.title)}<div class="card-title">${esc(ev.title)}</div>${single ? gauge(yesP) : ""}</div>
     ${body}
-    <div class="card-foot"><span class="num">${fmt.vol(ev.volume_24h)} 24h</span><span>${esc(fmt.date(ev.end))}</span></div></a>`;
+    <div class="card-foot"><span class="num">${fmt.vol(ev.volume)}</span>
+      <span>${ev.markets.length > 2 ? `${ev.markets.length} markets` : esc(fmt.date(ev.end))}</span></div></a>`;
 }
 
 function viewMarkets() {
@@ -329,18 +353,15 @@ function viewMarkets() {
       <button class="ghost-btn" data-act="retry-markets" type="button">Try again</button>`;
   }
   if (!m.data) {
-    const sk = Array.from({ length: 12 }, () => `<div class="skeleton" style="height:196px"></div>`).join("");
-    return `<div class="page-head"><h1 class="page">Markets</h1></div><div class="grid">${sk}</div>`;
+    const sk = Array.from({ length: 12 }, () => `<div class="skeleton" style="height:180px"></div>`).join("");
+    return `<div class="page-head"><h1 class="page">All markets</h1></div><div class="grid">${sk}</div>`;
   }
-  const chip = (tag, label) => `<a class="chip" href="#markets?tag=${encodeURIComponent(tag)}${m.query ? `&q=${encodeURIComponent(m.query)}` : ""}"
-    aria-pressed="${m.tag === tag}">${esc(label)}</a>`;
-  const label = (t) => t.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
   const events = m.data.events;
+  const title = m.query ? `Results for "${esc(m.query)}"` : m.tag ? esc(tagLabel(m.tag)) : "All markets";
   return `<div class="page-head">
-      <h1 class="page">${m.query ? `Results for "${esc(m.query)}"` : "Live markets"}</h1>
+      <h1 class="page">${title}</h1>
       <span class="muted small">${m.data.total} open events, live from Polymarket. Updated ${fmt.ago(m.data.as_of)}.</span>
     </div>
-    <div class="chips">${chip("", "Trending")}${m.data.tags.map((t) => chip(t, label(t))).join("")}</div>
     ${events.length ? `<div class="grid">${events.map(eventCard).join("")}</div>`
       : `<div class="empty"><h2>Nothing matches</h2><p>Try a shorter search or another category.</p></div>`}`;
 }
@@ -435,35 +456,36 @@ function viewEvent() {
   const ev = e.data, m = selMarket();
   const multi = ev.markets.length > 1;
   const intervals = ["1h", "6h", "1d", "1w", "1m", "max"].map((iv) => `<button data-act="interval" data-iv="${iv}"
-    aria-pressed="${e.interval === iv}" type="button">${iv === "max" ? "All" : iv.toUpperCase()}</button>`).join("");
-  const rows = multi ? `<div class="panel"><div class="outcome-table">
-      <div class="between" style="padding:12px 16px"><span class="label">Outcome</span><span class="label">Chance</span></div>
+    aria-pressed="${e.interval === iv}" type="button">${iv === "max" ? "ALL" : iv.toUpperCase()}</button>`).join("");
+  const rows = multi ? `<div class="outcome-table">
+      <div class="outcome-head"><span>Outcome</span><span style="text-align:center">% Chance</span><span></span></div>
       ${ev.markets.map((mk, i) => `<div class="outcome-line" data-act="pick-market" data-mi="${i}" aria-selected="${i === e.mi}">
-        <span class="name">${esc(mk.label)}</span><span class="pct num">${fmt.chance(mk.prices[0])}</span>
-        <button class="buy-yes" data-act="quick-buy" data-mi="${i}" data-oi="0" type="button">Buy Yes ${fmt.cents(mk.prices[0])}</button>
-        <button class="buy-no" data-act="quick-buy" data-mi="${i}" data-oi="1" type="button">Buy No ${fmt.cents(mk.prices[1])}</button>
-      </div>`).join("")}</div></div>` : "";
+        <div style="min-width:0"><div class="name">${esc(mk.label)}</div><div class="sub num">${fmt.vol(mk.volume)}</div></div>
+        <span class="pct num">${fmt.chance(mk.prices[0])}</span>
+        <button class="buy-yes ${i === e.mi && e.oi === 0 ? "on" : ""}" data-act="quick-buy" data-mi="${i}" data-oi="0" type="button">Buy Yes ${fmt.cents(mk.prices[0])}</button>
+        <button class="buy-no ${i === e.mi && e.oi === 1 ? "on" : ""}" data-act="quick-buy" data-mi="${i}" data-oi="1" type="button">Buy No ${fmt.cents(mk.prices[1])}</button>
+      </div>`).join("")}</div>` : "";
   const outcomeName = m.outcomes[e.oi];
+  const crumbs = (ev.tags || []).slice(0, 2).map(tagLabel).join(" · ");
   return `<div class="market">
     <div class="market-main">
       <div class="market-head">${iconFor(ev.icon, ev.title, "lg")}
-        <div><h1>${esc(ev.title)}</h1><div class="market-meta">
-          <span class="num">${fmt.vol(ev.volume)}</span><span>${ev.end ? `Ends ${esc(fmt.date(ev.end))}` : ""}</span>
-          <span class="tag tag-blue">LIVE DATA</span></div></div></div>
-      <div class="panel"><div class="panel-body">
-        <div class="between" style="flex-wrap:wrap">
-          <div><div class="label">${esc(multi ? `${m.label} / ${outcomeName}` : outcomeName)}</div>
-            <span class="chance-big num" id="chance-now">${fmt.chance(m.prices[e.oi])}</span> <span class="muted">chance</span></div>
-          <div class="segmented">${intervals}</div>
+        <div>${crumbs ? `<div class="crumbs">${esc(crumbs)}</div>` : ""}<h1>${esc(ev.title)}</h1></div></div>
+      <div>
+        <div class="label">${esc(multi ? `${m.label} · ${outcomeName}` : outcomeName)}</div>
+        <div class="chance-line"><span class="chance-big num" id="chance-now">${fmt.chance(m.prices[e.oi])}</span><span class="muted">chance</span></div>
+        <div class="chart" id="event-chart" style="margin-top:8px"></div>
+        <div class="chart-foot">
+          <div class="market-meta"><span class="num">${fmt.vol(ev.volume)}</span>${ev.end ? `<span class="sep"></span><span>${esc(fmt.date(ev.end))}</span>` : ""}</div>
+          <div class="intervals">${intervals}</div>
         </div>
-        <div class="chart" id="event-chart" style="margin-top:12px"></div>
-      </div></div>
+      </div>
       ${rows}
-      <div class="panel"><div class="panel-head"><h2 class="panel-title">Order book: ${esc(multi ? `${m.label}, ` : "")}${esc(outcomeName)}</h2>
-          <span class="muted small">Live, refreshes every 3 s</span></div>
+      <div class="panel"><div class="panel-head"><h2 class="panel-title">Order Book</h2>
+          <span class="muted small">${esc(multi ? `${m.label} · ` : "")}Trade ${esc(outcomeName)} · live</span></div>
         <div class="panel-body" id="book-body">${e.book ? bookLadder(e.book) : `<div class="skeleton" style="height:260px"></div>`}</div></div>
-      <details class="panel"><summary class="panel-body" style="cursor:pointer"><b>Rules</b></summary>
-        <div class="panel-body rules">${esc(ev.description || "No rules text provided.")}</div></details>
+      <details class="panel" open><summary class="panel-body" style="cursor:pointer"><b>Rules</b></summary>
+        <div class="panel-body rules" style="padding-top:0">${esc(ev.description || "No rules text provided.")}</div></details>
     </div>
     <aside class="trade" id="trade">${tradeHtml()}</aside>
   </div>`;
@@ -486,17 +508,14 @@ function tradeHtml() {
   let inputs;
   if (market) {
     inputs = buy
-      ? `<div class="field"><div class="between"><label for="amt">Amount</label>
-          <span class="muted small">Cash ${fmt.usd(pf?.free_cash)}</span></div>
-          <div class="input-wrap"><span class="prefix">$</span>
-          <input class="input big" id="amt" data-trade="amount" inputmode="decimal" placeholder="0" value="${esc(e.amount)}"></div>
-          <div class="quick">${[1, 20, 100].map((v) => `<button data-act="add-amount" data-v="${v}" type="button">+$${v}</button>`).join("")}
-          <button data-act="max-amount" type="button">Max</button></div></div>`
-      : `<div class="field"><div class="between"><label for="amt">Shares</label>
-          <span class="muted small">You hold ${fmt.num(held?.shares || 0)}</span></div>
-          <input class="input big" id="amt" data-trade="amount" inputmode="decimal" placeholder="0" value="${esc(e.amount)}">
+      ? `<div class="amount-row"><label class="lbl" for="amt"><b>Amount</b><span>Cash ${fmt.usd(pf?.free_cash)}</span></label>
+          <input class="amount-input" id="amt" data-trade="amount" inputmode="decimal" placeholder="$0" value="${e.amount ? `$${esc(e.amount)}` : ""}"></div>
+          <div class="quick">${[1, 5, 10, 100].map((v) => `<button data-act="add-amount" data-v="${v}" type="button">+$${v}</button>`).join("")}
+          <button data-act="max-amount" type="button">Max</button></div>`
+      : `<div class="amount-row"><label class="lbl" for="amt"><b>Shares</b><span>You hold ${fmt.num(held?.shares || 0)}</span></label>
+          <input class="amount-input" id="amt" data-trade="amount" inputmode="decimal" placeholder="0" value="${esc(e.amount)}"></div>
           <div class="quick">${[0.25, 0.5].map((f) => `<button data-act="share-frac" data-f="${f}" type="button">${f * 100}%</button>`).join("")}
-          <button data-act="share-frac" data-f="1" type="button">Max</button></div></div>`;
+          <button data-act="share-frac" data-f="1" type="button">Max</button></div>`;
   } else {
     inputs = `<div class="form-grid">
       <div class="field"><label for="lp">Limit price (¢)</label>
@@ -520,7 +539,6 @@ function tradeHtml() {
     preview = `<div class="preview"><div class="between"><span>Total</span><span class="num">${fmt.usd(total)}</span></div>
       ${buy ? `<div class="between"><span>To win</span><span class="to-win num">${fmt.usd(Number(e.shares))}</span></div>` : ""}</div>`;
   }
-  const verb = `${buy ? "Buy" : "Sell"} ${m.outcomes[e.oi]}`;
   const yourPos = mine.positions.length || mine.orders.length ? `<div class="panel"><div class="panel-head"><h2 class="panel-title">Your position</h2></div>
     <div class="panel-body stack">
       ${mine.positions.map((p) => `<div class="between"><span><span class="tag ${p.outcome === m.outcomes[0] ? "tag-yes" : "tag-no"}">${esc(p.outcome)}</span>
@@ -531,7 +549,9 @@ function tradeHtml() {
           <button class="ghost-btn small" data-act="remove-limit" data-id="${o.id}" type="button">Cancel</button></div>`).join("")}
     </div></div>` : "";
   return `<div class="panel trade-panel">
-      <div class="trade-target">${iconFor(ev.icon, ev.title, "sm")}<span>${esc(multi ? m.label : ev.title)}</span></div>
+      <div class="trade-target">${iconFor(ev.icon, ev.title, "sm")}<div style="min-width:0">
+        <div class="t1">${esc(ev.title)}</div>
+        <div class="t2">${multi ? `${esc(m.label)} · ` : ""}<span class="${e.oi === 0 ? "yes" : "no"}">${buy ? "Buy" : "Sell"} ${esc(m.outcomes[e.oi])}</span></div></div></div>
       <div class="side-tabs"><div class="tabbar">
           <button class="st" data-act="side" data-side="BUY" aria-pressed="${buy}" type="button">Buy</button>
           <button class="st" data-act="side" data-side="SELL" aria-pressed="${!buy}" type="button">Sell</button></div>
@@ -540,9 +560,9 @@ function tradeHtml() {
       <div class="outcome-pick">${m.outcomes.map((o, i) => `<button class="${i === 0 ? "y" : "n"}" data-act="pick-outcome" data-oi="${i}"
           aria-pressed="${e.oi === i}" type="button">${esc(o)} ${fmt.cents(m.prices[i])}</button>`).join("")}</div>
       ${inputs}${preview}
-      <button class="primary-btn" data-act="submit-trade" type="button" ${e.busy ? "disabled" : ""}>${e.busy ? "Placing order" : esc(verb)}</button>
-      <p class="disclaimer">Paper trading: fills against the live Polymarket book, nothing is sent to Polymarket.</p>
+      <button class="primary-btn" data-act="submit-trade" type="button" ${e.busy ? "disabled" : ""}>${e.busy ? "Placing order" : "Trade"}</button>
     </div>
+    <p class="disclaimer">Paper trading: fills against the live Polymarket book, nothing is sent to Polymarket.</p>
     ${yourPos}
     <div class="panel"><div class="panel-body stack">
       <b>Automate this market</b>
@@ -560,7 +580,7 @@ function drawEventChart() {
   const short = ["1h", "6h", "1d"].includes(e.interval);
   lineChart(el, pts, {
     yMin: Math.max(0, Math.min(...pts.map((p) => p[1])) - 0.03),
-    yMax: Math.min(1, Math.max(...pts.map((p) => p[1])) + 0.03), padLeft: 44,
+    yMax: Math.min(1, Math.max(...pts.map((p) => p[1])) + 0.03), axisRight: true, fill: false,
     yFmt: (v) => `${Math.round(v * 100)}%`,
     xFmt: (t) => new Date(t).toLocaleString("en-US", short ? { hour: "2-digit", minute: "2-digit", hour12: false } : { month: "short", day: "numeric" }),
     tip: (p) => `${new Date(p[0]).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}  ${fmt.chance(p[1])}`,
@@ -583,7 +603,9 @@ function renderPreviewOnly() {
   renderTradeOnly();
   if (active) {
     const el = document.querySelector(`[data-trade="${active}"]`);
-    if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (x) { /* not a text input */ } }
+    // The amount field gains a "$" prefix on re-render, so keep the caret at the end there.
+    const at = active === "amount" ? el?.value.length : pos;
+    if (el) { el.focus(); try { el.setSelectionRange(at, at); } catch (x) { /* not a text input */ } }
   }
 }
 
@@ -1189,6 +1211,10 @@ async function runCompare() {
 
 const ACTIONS = {
   "close-modal": (el, e) => { if (e.target.closest("[data-stop]") && !e.target.closest("[data-act='close-modal']")) return; $("#modal-root").innerHTML = ""; },
+  "card-buy": (el, e) => {
+    e.preventDefault();
+    location.hash = `#event/${encodeURIComponent(el.dataset.slug)}?token=${encodeURIComponent(el.dataset.token)}`;
+  },
   "retry-markets": () => { state.markets.data = null; render(); loadMarkets(); },
   "interval": (el) => { state.event.interval = el.dataset.iv; state.event.history = null; render(); loadHistory(); },
   "pick-market": (el, e) => {
@@ -1263,7 +1289,7 @@ document.addEventListener("input", (e) => {
   const t = e.target;
   if (t.dataset.trade && state.event) {
     if (t.dataset.trade === "type") return;
-    state.event[t.dataset.trade] = t.value;
+    state.event[t.dataset.trade] = t.dataset.trade === "amount" ? t.value.replace(/[$,\s]/g, "") : t.value;
     if (t.dataset.trade === "amount") refreshQuote(); else renderPreviewOnly();
   } else if (t.id === "b-search") {
     debouncedBuilderSearch(t.value);
@@ -1294,6 +1320,7 @@ document.addEventListener("change", (e) => {
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") $("#modal-root").innerHTML = "";
+  if (e.key === "/" && !e.target.closest("input, textarea, select")) { e.preventDefault(); searchInput.focus(); }
   if (e.key === "Enter" && e.target.dataset?.trade && e.target.dataset.trade !== "type") submitTrade();
 });
 
@@ -1307,3 +1334,4 @@ window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer
 refreshPortfolio();
 setInterval(() => { if (!document.hidden && state.route.view !== "portfolio") refreshPortfolio(); }, 20_000);
 route();
+if (state.route.view !== "markets") loadTags();

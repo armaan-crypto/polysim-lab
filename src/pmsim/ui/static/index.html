@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>polysim</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="app.css">
   <script>
     try {
@@ -16,24 +19,31 @@
   <header class="topbar">
     <div class="topbar-row">
       <a class="brand" href="#markets" aria-label="polysim home">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2.5" y="2.5" width="19" height="19" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M8 16V8h4.5a2.5 2.5 0 0 1 0 5H8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
         <span class="brand-name">polysim</span>
-        <span class="brand-tag">Paper money</span>
       </a>
+      <nav class="sections" aria-label="Sections">
+        <a class="tab" data-view="markets" href="#markets">Markets</a>
+        <a class="tab" data-view="portfolio" href="#portfolio">Portfolio</a>
+        <a class="tab" data-view="bots" href="#bots">Bots</a>
+        <a class="tab" data-view="lab" href="#lab">Lab</a>
+      </nav>
       <label class="search">
-        <input id="search" type="search" placeholder="Search Polymarket" aria-label="Search markets" autocomplete="off">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="search" type="search" placeholder="Search markets..." aria-label="Search markets" autocomplete="off">
+        <kbd>/</kbd>
       </label>
       <div class="top-actions">
         <a class="balance" href="#portfolio" id="balance-portfolio"><span>Portfolio</span><b class="num">-</b></a>
         <a class="balance" href="#portfolio" id="balance-cash"><span>Cash</span><b class="num">-</b></a>
-        <button class="ghost-btn" id="theme-btn" type="button" aria-label="Switch theme">Auto</button>
+        <span class="paper-pill" title="Trades use paper money and never reach Polymarket">Paper</span>
+        <button class="icon-btn" id="theme-btn" type="button" aria-label="Switch theme">Auto</button>
       </div>
     </div>
-    <nav class="tabs" aria-label="Sections">
-      <a class="tab" data-view="markets" href="#markets">Markets</a>
-      <a class="tab" data-view="portfolio" href="#portfolio">Portfolio</a>
-      <a class="tab" data-view="bots" href="#bots">Bots</a>
-      <a class="tab" data-view="lab" href="#lab">Strategy lab</a>
-    </nav>
+    <nav class="cats" id="cats" aria-label="Categories"></nav>
   </header>
 
   <main id="app" aria-live="polite"></main>
