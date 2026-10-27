@@ -170,6 +170,7 @@ class MarketView:
     gas_cash: int = 0
     orders: OrdersSource | None = None
     trades: Mapping[str, GuardedSeries[TradePrint]] = field(default_factory=dict)
+    visible: Callable[[str, Side, int], int] | None = None  # depth net of our own takes
 
     @property
     def now(self) -> int:
@@ -181,7 +182,13 @@ class MarketView:
             return None
         as_of = self.book_times.get(token, 0)
         self.clock.check(as_of, f"book {token}")
-        return BookView(as_of, tuple(book.levels("BUY")), tuple(book.levels("SELL")))
+        return BookView(as_of, self._levels(token, book, "BUY"), self._levels(token, book, "SELL"))
+
+    def _levels(self, token: str, book: L2Book, side: Side) -> tuple[Level, ...]:
+        if self.visible is None:
+            return tuple(book.levels(side))
+        net = ((p, self.visible(token, side, p)) for p, _ in book.levels(side))
+        return tuple((p, s) for p, s in net if s > 0)
 
     def position(self, token: str) -> int:
         return self.positions.get(token, 0)

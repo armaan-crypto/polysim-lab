@@ -49,10 +49,14 @@ class MarketMaker(Strategy):
         bid = min(snap_down(fair - cfg.half_spread_ticks * tick, tick), book.best_ask[0] - tick)
         ask = max(snap_up(fair + cfg.half_spread_ticks * tick, tick), book.best_bid[0] + tick)
         size = size_units(cfg.quote_shares)
+        dying = {"BUY": 0, "SELL": 0}  # orders being cancelled can still fill
+        for order_id, side, _, remaining in view.open_orders(token):
+            if order_id in self._cancelling:
+                dying[side] += remaining
         out: dict[Side, tuple[int, int]] = {}
-        if inv + size <= size_units(cfg.max_inventory_shares) and tick <= bid:
+        if inv + dying["BUY"] + size <= size_units(cfg.max_inventory_shares) and tick <= bid:
             out["BUY"] = (bid, size)
-        sell = min(size, inv)
+        sell = min(size, inv - dying["SELL"])
         if sell >= view.rules[token].min_size and ask <= PRICE_SCALE - tick:
             out["SELL"] = (ask, sell)
         return out
@@ -74,6 +78,7 @@ class MarketMaker(Strategy):
                 out.append(CancelIntent(order_id))
             else:
                 live.add(side)
+        want = self.quotes(token)  # resize now that the new cancels count as dying
         for side, (price, size) in want.items():
             if side not in live:
                 out.append(OrderIntent(token, side, price, size, "GTC", tag="quote"))

@@ -18,6 +18,11 @@ from pmsim.data.http import HttpClient
 KALSHI_URL = "https://api.elections.kalshi.com/trade-api/v2"
 
 
+def leg_token(ticker: str, outcome: str) -> str:
+    """Pseudo token for a Kalshi position held in a pmsim portfolio."""
+    return f"kalshi:{ticker}:{outcome}"
+
+
 class KalshiMarket(BaseModel):
     model_config = ConfigDict(extra="ignore", frozen=True)
 

@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pmsim.book.units import PRICE_SCALE, size_units
 from pmsim.data.kalshi import QuoteFeed
+from pmsim.data.kalshi import leg_token as kalshi_leg
 from pmsim.engine.fees import FeeModel
 from pmsim.engine.fills import Fill
 from pmsim.strategies.base import BookUpdate, ExternalIntent, Intent, OrderIntent
@@ -44,11 +45,6 @@ class CrossPlatformConfig(BaseModel):
     kalshi_fee_rate: float = Field(default=0.07, ge=0)  # assumed, same form as Polymarket
     max_shares: float = Field(default=100, gt=0)
     leg_timeout_ms: int = Field(default=3_000, gt=0)
-
-
-def kalshi_leg(ticker: str, outcome: str) -> str:
-    """Pseudo token used to track the Kalshi leg inside a leg group."""
-    return f"kalshi:{ticker}:{outcome}"
 
 
 class CrossPlatformSpread(LegStrategy):

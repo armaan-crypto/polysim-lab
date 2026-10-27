@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pmsim.book.l2 import Level
 from pmsim.book.replay import BookSnapshot, MarketEvent, TradePrint
 from pmsim.book.units import PRICE_SCALE, size_units
-from pmsim.data.kalshi import MockQuoteFeed, Quote
+from pmsim.data.kalshi import MockQuoteFeed, Quote, leg_token
 from pmsim.engine.fees import FeeModel, MarketRules
 from pmsim.engine.universe import CrossLink, MarketData, Universe
 from pmsim.risk.negrisk import GroupMarket, NegRiskGroup
@@ -53,6 +53,7 @@ class SyntheticConfig(BaseModel):
     trades_per_step: float = Field(default=0.5, ge=0)
     fee_rate: float = Field(default=0.0, ge=0)
     kalshi_noise: float = Field(default=0.02, ge=0)
+    p_kalshi_disagree: float = Field(default=0.02, ge=0, le=1)  # rule mismatch risk
 
 
 @dataclass
@@ -98,8 +99,10 @@ class Generator:
         ask = max(bid + tick, min(PRICE_SCALE - tick, mid + half))
         no_bid, no_ask = PRICE_SCALE - ask, PRICE_SCALE - bid
         if self.rng.random() < cfg.p_mispricing:
+            # both asks drop, so YES ask + NO ask < 1; bids move down to stay below
             cut = cfg.mispricing_ticks * tick
-            ask, no_ask = max(bid + tick, ask - cut), max(no_bid + tick, no_ask - cut)
+            ask, no_ask = max(tick * 2, ask - cut), max(tick * 2, no_ask - cut)
+            bid, no_bid = min(bid, ask - tick), min(no_bid, no_ask - tick)
         for token, b, a in ((book.yes, bid, ask), (book.no, no_bid, no_ask)):
             bids = self._levels(b, -1, book.depth)
             asks = self._levels(a, 1, book.depth)
@@ -203,11 +206,15 @@ class Generator:
                     self._step_book(book, p, ts)
 
         res_ts = self.end_ts + 2 * HOUR_MS
-        for book, x in binaries:
+        for m, (book, x) in enumerate(binaries):
             yes_wins = self.rng.random() < _sigmoid(x)
-            resolutions.append(
-                Resolution(res_ts, "winner", binary_payouts(book.yes, book.no, "winner", yes_wins))
+            payouts = binary_payouts(book.yes, book.no, "winner", yes_wins)
+            k_yes = yes_wins != (self.rng.random() < cfg.p_kalshi_disagree)
+            ticker = f"K-syn{m}"
+            payouts.update(
+                binary_payouts(leg_token(ticker, "yes"), leg_token(ticker, "no"), "winner", k_yes)
             )
+            resolutions.append(Resolution(res_ts, "winner", payouts))
         for group, (_, xs) in zip(groups, group_state, strict=True):
             winner = self._pick(_softmax(xs))
             resolutions.append(Resolution(res_ts, "winner", group_payouts(group, winner)))

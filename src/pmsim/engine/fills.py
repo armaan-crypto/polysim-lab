@@ -97,6 +97,11 @@ class FillEngine:
         self._schedule(now + self.latency_ms, "cancel", order_id)
         return True
 
+    def close_market(self, token: str, reason: str) -> None:
+        """Exchange side: trading stopped, every open order on `token` is cancelled now."""
+        for order in self.open_orders(token):
+            order.status, order.reason = "cancelled", reason
+
     def open_orders(self, token: str | None = None) -> list[SimOrder]:
         return [
             o
