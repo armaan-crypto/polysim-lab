@@ -102,13 +102,17 @@ def snapshot(fake: FakePolymarket) -> OrderBookSnapshot:
 # ---- data --------------------------------------------------------------------------------
 
 
-def test_parse_event_skips_closed_and_tokenless() -> None:
+def test_parse_event_skips_markets_polymarket_hides() -> None:
     ev = parse_event(FED)
     assert ev is not None and ev.title == "Fed Decision in October?" and ev.markets
     assert all(m.event_title == ev.title for m in ev.markets)
     closed = {**FED, "markets": [{**m, "closed": True} for m in FED["markets"]]}
     assert parse_event(closed) is None
     assert parse_event({**FED, "markets": [{"id": "x"}]}) is None
+    inactive = {**FED, "markets": [{**m, "active": False} for m in FED["markets"]]}
+    assert parse_event(inactive) is None  # placeholders like "Other" or "Team H"
+    archived = {**FED, "markets": [{**m, "archived": True} for m in FED["markets"]]}
+    assert parse_event(archived) is None  # stale duplicates polymarket.com hides
 
 
 def test_live_data_caches_events(data: LiveData, fake: FakePolymarket) -> None:

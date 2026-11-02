@@ -65,10 +65,14 @@ class _Cache:
 
 
 def parse_event(raw: dict[str, Any]) -> LiveEvent | None:
-    """An open event with at least one tradable market, else None."""
+    """An open event with at least one tradable market, else None.
+
+    Inactive placeholders ("Other", "Team H") and archived duplicates have no order book and
+    polymarket.com hides them, so they are dropped here too.
+    """
     markets = []
     for m in raw.get("markets") or []:
-        if not m.get("clobTokenIds") or m.get("closed"):
+        if not m.get("clobTokenIds") or m.get("closed") or not m.get("active") or m.get("archived"):
             continue
         try:
             market = Market.model_validate(
