@@ -66,6 +66,7 @@ def _market_json(data: LiveData, ev: LiveEvent, m: Market, watch: bool) -> dict[
         "slug": m.slug,
         "label": m.group_item_title or m.question,
         "question": m.question,
+        "kind": m.sports_market_type,
         "outcomes": m.outcomes,
         "prices": m.outcome_prices if yes is None else [yes, 1 - yes],
         "buy": buy,
@@ -80,8 +81,13 @@ def _market_json(data: LiveData, ev: LiveEvent, m: Market, watch: bool) -> dict[
     }
 
 
+def _display_order(m: Market) -> tuple[bool, float]:
+    """Polymarket leads a game with its moneyline (who wins), then the likeliest outcomes."""
+    return m.sports_market_type != "moneyline", -(m.outcome_prices[0] if m.outcome_prices else 0)
+
+
 def _event_json(data: LiveData, ev: LiveEvent, full: bool = False) -> dict[str, Any]:
-    markets = sorted(ev.markets, key=lambda m: -(m.outcome_prices[0] if m.outcome_prices else 0))
+    markets = sorted(ev.markets, key=_display_order)
     out = {
         "id": ev.id,
         "slug": ev.slug,

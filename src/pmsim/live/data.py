@@ -177,7 +177,9 @@ class LiveData:
                     "ascending": "false",
                 },
             )
-            out.extend(ev for ev in (parse_event(r) for r in raw) if ev is not None)
+            # "- More Markets" sub-events belong to a game page; polymarket.com does not list them.
+            listed = (parse_event(r) for r in raw if not r.get("parentEventId"))
+            out.extend(ev for ev in listed if ev is not None)
             if len(raw) < EVENT_PAGE:
                 break
         return out

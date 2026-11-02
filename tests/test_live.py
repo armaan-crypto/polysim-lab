@@ -5,6 +5,7 @@ book whose levels each test controls.
 """
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -113,6 +114,18 @@ def test_parse_event_skips_markets_polymarket_hides() -> None:
     assert parse_event(inactive) is None  # placeholders like "Other" or "Team H"
     archived = {**FED, "markets": [{**m, "archived": True} for m in FED["markets"]]}
     assert parse_event(archived) is None  # stale duplicates polymarket.com hides
+
+
+def test_games_lead_with_moneyline_and_sub_events_are_hidden(
+    make_http: Callable[..., Any], tmp_path: Path
+) -> None:
+    game, sub = load_fixture("gamma_game_events.json")
+    http, _ = make_http({"/events": [sub, game]})
+    data = LiveData(ApiConfig(), http)
+    assert [ev.slug for ev in data.events()] == [game["slug"]]  # "- More Markets" is not listed
+    ctx = desk_api.make_context(Config(data_dir=tmp_path), data)
+    first = desk_api.live_event(ctx, game["slug"])["markets"][0]
+    assert first["kind"] == "moneyline" and first["outcomes"] == ["Hawks", "Pacers"]
 
 
 def test_live_data_caches_events(data: LiveData, fake: FakePolymarket) -> None:

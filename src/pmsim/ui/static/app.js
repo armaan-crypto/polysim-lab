@@ -65,7 +65,6 @@ const fmt = {
   chance(p) {
     if (p === null || p === undefined) return "-";
     if (p < 0.005) return "<1%";
-    if (p > 0.995) return ">99%";
     return `${Math.round(p * 100)}%`;
   },
   cents(p) {
@@ -149,8 +148,10 @@ function lineChart(el, pts, opts = {}) {
   const w = el.clientWidth, h = el.clientHeight;
   if (!pts.length || !w) { el.innerHTML = `<p class="muted">${esc(opts.empty || "No data yet.")}</p>`; return; }
   const pad = opts.axisRight ? { l: 0, r: 44, t: 10, b: 24 } : { l: opts.padLeft ?? 56, r: 12, t: 10, b: 24 };
-  const xs = pts.map((p) => p[0]);
-  let ys = pts.map((p) => p[1]);
+  const extra = opts.extra || [];
+  const every = pts.concat(...extra.map((s) => s.pts));
+  const xs = every.map((p) => p[0]);
+  let ys = every.map((p) => p[1]);
   if (opts.base !== undefined) ys = ys.concat([opts.base]);
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
   let y0 = opts.yMin ?? Math.min(...ys), y1 = opts.yMax ?? Math.max(...ys);
@@ -176,6 +177,8 @@ function lineChart(el, pts, opts = {}) {
       text-anchor="${opts.axisRight && i === 0 ? "start" : "middle"}">${esc(opts.xFmt ? opts.xFmt(t) : t.toFixed(1))}</text>`).join("")}
     ${opts.base !== undefined ? `<line class="base" x1="${pad.l}" x2="${w - pad.r}" y1="${sy(opts.base)}" y2="${sy(opts.base)}"/>` : ""}
     ${opts.fill === false ? "" : `<path d="${area}" fill="url(#${gid})"/>`}
+    ${extra.map((s) => `<path d="${s.pts.map((p, i) => `${i ? "L" : "M"}${sx(p[0]).toFixed(1)},${sy(p[1]).toFixed(1)}`).join("")}"
+      fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`).join("")}
     <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
     ${markers}
     <line class="cross" y1="${pad.t}" y2="${h - pad.b}" stroke="var(--line-2)" visibility="hidden"/>
@@ -340,9 +343,12 @@ function patchCards() {
   return true;
 }
 
+// A game's moneyline names the teams as its outcomes instead of Yes and No.
+const teamLine = (m) => m.kind === "moneyline" && m.outcomes[0] !== "Yes";
+
 function eventCard(ev) {
-  const single = ev.markets.length === 1;
   const m0 = ev.markets[0];
+  const single = ev.markets.length === 1 || teamLine(m0);
   const yesP = m0.prices[0];
   const buy = (m, oi, cls, label) => `<span class="${cls}" data-act="card-buy" data-slug="${esc(ev.slug)}"
     data-token="${esc(m.tokens[oi] || "")}">${label}</span>`;
@@ -385,7 +391,7 @@ function enterEvent() {
   const slug = state.route.arg;
   const p = state.route.params;
   state.event = {
-    slug, data: null, error: null, mi: 0, oi: 0, interval: "1w", history: null, book: null,
+    slug, data: null, error: null, mi: 0, oi: 0, interval: "max", history: null, series: null, book: null,
     side: p.get("side") === "SELL" ? "SELL" : "BUY", type: "market", amount: "", price: "", shares: "",
     quote: null, busy: false, preselect: p.get("token") || "",
   };
@@ -415,13 +421,37 @@ async function loadEvent() {
 const selMarket = () => state.event.data.markets[state.event.mi];
 const selToken = () => selMarket().tokens[state.event.oi];
 
-async function loadHistory() {
-  const e = state.event;
+const SERIES_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)"];
+
+// What the event chart plots: a game's two teams, else the four likeliest outcomes, else null (one line).
+function chartLines() {
+  const ms = state.event.data.markets;
+  if (teamLine(ms[0])) return ms[0].outcomes.map((o, oi) => ({ label: o, mi: 0, oi }));
+  if (ms.length === 1) return null;
+  return ms.slice(0, 4).map((m, mi) => ({ label: m.label, mi, oi: 0 }));
+}
+
+const linePrice = (l) => state.event.data.markets[l.mi].prices[l.oi];
+
+async function fetchHistory(token, interval) {
   try {
-    const out = await request(`/api/live/history?token=${encodeURIComponent(selToken())}&interval=${e.interval}`);
-    e.history = out.points;
-  } catch (err) { e.history = []; }
+    return (await request(`/api/live/history?token=${encodeURIComponent(token)}&interval=${interval}`)).points;
+  } catch (err) { return []; }
+}
+
+async function loadHistory() {
+  const e = state.event, lines = chartLines();
+  if (lines) {
+    e.series = await Promise.all(lines.map((l) => fetchHistory(e.data.markets[l.mi].tokens[l.oi], e.interval)));
+  } else {
+    e.history = await fetchHistory(selToken(), e.interval);
+  }
   if (state.route.view === "event") { drawEventChart(); }
+}
+
+function legendHtml() {
+  return chartLines().map((l, i) => `<span class="legend-item"><i style="background:${SERIES_COLORS[i]}"></i>${esc(l.label)}
+    <b class="num">${fmt.chance(linePrice(l))}</b></span>`).join("");
 }
 
 // Merge fresh prices by market id and patch the rows, headline, chart and trade card in place.
@@ -439,8 +469,9 @@ async function refreshEvent() {
     const html = outcomeLine(e.data.markets[i], i);
     if (html !== e.rows[i]) { row.outerHTML = html; e.rows[i] = html; }
   });
-  const hdr = $("#chance-now");
+  const hdr = $("#chance-now"), legend = $("#legend");
   if (hdr) hdr.textContent = fmt.chance(selMarket().prices[e.oi]);
+  if (legend) legend.innerHTML = legendHtml();
   drawEventChart();
   if (!e.busy) { if (Number(e.amount) > 0) refreshQuote(); else renderPreviewOnly(); }
 }
@@ -490,8 +521,8 @@ function outcomeLine(mk, i) {
   return `<div class="outcome-line" data-act="pick-market" data-mi="${i}" aria-selected="${i === e.mi}">
     <div style="min-width:0"><div class="name">${esc(mk.label)}</div><div class="sub num">${fmt.vol(mk.volume)}</div></div>
     <span class="pct num">${fmt.chance(mk.prices[0])}</span>
-    <button class="buy-yes ${i === e.mi && e.oi === 0 ? "on" : ""}" data-act="quick-buy" data-mi="${i}" data-oi="0" type="button">Buy Yes ${fmt.cents(mk.buy[0])}</button>
-    <button class="buy-no ${i === e.mi && e.oi === 1 ? "on" : ""}" data-act="quick-buy" data-mi="${i}" data-oi="1" type="button">Buy No ${fmt.cents(mk.buy[1])}</button>
+    <button class="buy-yes ${i === e.mi && e.oi === 0 ? "on" : ""}" data-act="quick-buy" data-mi="${i}" data-oi="0" type="button">Buy ${esc(mk.outcomes[0])} ${fmt.cents(mk.buy[0])}</button>
+    <button class="buy-no ${i === e.mi && e.oi === 1 ? "on" : ""}" data-act="quick-buy" data-mi="${i}" data-oi="1" type="button">Buy ${esc(mk.outcomes[1])} ${fmt.cents(mk.buy[1])}</button>
   </div>`;
 }
 
@@ -519,11 +550,11 @@ function viewEvent() {
       <div class="market-head">${iconFor(ev.icon, ev.title, "lg")}
         <div>${crumbs ? `<div class="crumbs">${esc(crumbs)}</div>` : ""}<h1>${esc(ev.title)}</h1></div></div>
       <div>
-        <div class="label">${esc(multi ? `${m.label} · ${outcomeName}` : outcomeName)}</div>
-        <div class="chance-line"><span class="chance-big num" id="chance-now">${fmt.chance(m.prices[e.oi])}</span><span class="muted">chance</span></div>
+        ${chartLines() ? `<div class="legend" id="legend">${legendHtml()}</div>` : `<div class="label">${esc(outcomeName)}</div>
+        <div class="chance-line"><span class="chance-big num" id="chance-now">${fmt.chance(m.prices[e.oi])}</span><span class="muted">chance</span></div>`}
         <div class="chart" id="event-chart" style="margin-top:8px"></div>
         <div class="chart-foot">
-          <div class="market-meta"><span class="num">${fmt.vol(ev.volume)}</span>${ev.end ? `<span class="sep"></span><span>${esc(fmt.date(ev.end))}</span>` : ""}</div>
+          <div class="market-meta"><span class="num">$${Math.round(ev.volume).toLocaleString("en-US")} Vol.</span>${ev.end ? `<span class="sep"></span><span>${esc(fmt.date(ev.end))}</span>` : ""}</div>
           <div class="intervals">${intervals}</div>
         </div>
       </div>
@@ -622,13 +653,19 @@ function drawEventChart() {
   const e = state.event;
   const el = $("#event-chart");
   if (!el || !e?.data) return;
-  if (e.history === null) { el.innerHTML = `<div class="skeleton" style="height:100%"></div>`; return; }
-  // Polymarket's line ends at the live price, not the last history bucket.
-  const pts = e.history.length ? [...e.history, [Date.now(), selMarket().prices[e.oi]]] : e.history;
+  const lines = chartLines();
+  const raw = lines ? e.series : e.history && [e.history];
+  if (!raw) { el.innerHTML = `<div class="skeleton" style="height:100%"></div>`; return; }
+  // Polymarket's lines end at the live price, not the last history bucket.
+  const live = raw.map((h, i) => (h.length ? [...h, [Date.now(), lines ? linePrice(lines[i]) : selMarket().prices[e.oi]]] : h));
+  const pts = live[0];
+  const ys = live.flat().map((p) => p[1]);
   const short = ["1h", "6h", "1d"].includes(e.interval);
   lineChart(el, pts, {
-    yMin: Math.max(0, Math.min(...pts.map((p) => p[1])) - 0.03),
-    yMax: Math.min(1, Math.max(...pts.map((p) => p[1])) + 0.03), axisRight: true, fill: false,
+    extra: live.slice(1).map((p, i) => ({ pts: p, color: SERIES_COLORS[i + 1] })).filter((s) => s.pts.length).reverse(),
+    color: lines ? SERIES_COLORS[0] : undefined,
+    yMin: Math.max(0, Math.min(...ys) - 0.03),
+    yMax: Math.min(1, Math.max(...ys) + 0.03), axisRight: true, fill: false,
     yFmt: (v) => `${Math.round(v * 100)}%`,
     xFmt: (t) => new Date(t).toLocaleString("en-US", short ? { hour: "2-digit", minute: "2-digit", hour12: false } : { month: "short", day: "numeric" }),
     tip: (p) => `${new Date(p[0]).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}  ${fmt.chance(p[1])}`,
@@ -1264,7 +1301,7 @@ const ACTIONS = {
     location.hash = `#event/${encodeURIComponent(el.dataset.slug)}?token=${encodeURIComponent(el.dataset.token)}`;
   },
   "retry-markets": () => { state.markets.data = null; render(); loadMarkets(); },
-  "interval": (el) => { state.event.interval = el.dataset.iv; state.event.history = null; render(); loadHistory(); },
+  "interval": (el) => { state.event.interval = el.dataset.iv; state.event.history = null; state.event.series = null; render(); loadHistory(); },
   "pick-market": (el, e) => {
     if (e.target.closest("button")) return;
     const ev = state.event; ev.mi = Number(el.dataset.mi); ev.oi = 0; ev.history = null; ev.book = null; ev.quote = null;

@@ -37,6 +37,10 @@
   --shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 2px 6px -0.5px rgba(0, 0, 0, 0.025), 0 2px 10px rgba(0, 0, 0, 0.025);
   --shadow-hover: 0 0 0 1px rgba(0, 0, 0, 0.09), 0 4px 14px rgba(0, 0, 0, 0.06);
   --overlay: rgba(10, 11, 16, 0.45);
+  --s1: #2e5cff;
+  --s2: #5cb8f5;
+  --s3: #f2c230;
+  --s4: #f2711c;
   color-scheme: light;
 }
 
@@ -294,6 +298,10 @@ code.cmd { font-family: var(--mono); font-size: 12px; background: var(--bg-2); b
 .market-meta { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted); }
 .market-meta .sep { width: 1px; height: 14px; background: var(--line-2); }
 .chance-line { display: flex; align-items: baseline; gap: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--muted); }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.legend-item i { width: 8px; height: 8px; border-radius: 50%; }
+.legend-item b { color: var(--text); font-weight: 600; }
 .chance-big { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; color: var(--accent); }
 .chance-line .muted { font-size: 16px; font-weight: 500; color: var(--accent); }
 .chart { position: relative; height: 300px; }
@@ -452,10 +460,15 @@ details.panel[open] summary::after { content: "\2212"; }
   .cats .cat.section, .cats .cat-sep.section { display: flex; }
 }
 @media (max-width: 1080px) {
-  .market, .lab, .builder { grid-template-columns: minmax(0, 1fr); }
-  .trade, .lab-side { position: static; max-height: none; }
+  .market { grid-template-columns: minmax(0, 1fr) 280px; }
+  .lab, .builder { grid-template-columns: minmax(0, 1fr); }
+  .lab-side { position: static; max-height: none; }
   .two { grid-template-columns: 1fr; }
   .tiles { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 767px) {
+  .market { grid-template-columns: minmax(0, 1fr); }
+  .trade { position: static; }
 }
 @media (max-width: 720px) {
   .topbar-row { grid-template-columns: auto auto; height: auto; padding: 12px 16px; row-gap: 10px; }

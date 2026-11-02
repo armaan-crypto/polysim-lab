@@ -49,6 +49,7 @@ class Market(_Api):
     neg_risk_market_id: str = Field(default="", alias="negRiskMarketID")
     neg_risk_other: bool = Field(default=False, alias="negRiskOther")
     group_item_title: str = Field(default="", alias="groupItemTitle")
+    sports_market_type: str | None = Field(default=None, alias="sportsMarketType")
     event_id: str = ""
     event_title: str = ""
     outcome_prices: list[float] = Field(default_factory=list, alias="outcomePrices")
